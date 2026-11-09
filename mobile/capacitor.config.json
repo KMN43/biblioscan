@@ -1,0 +1,8 @@
+{
+  "appId": "com.kmn43.biblioscan",
+  "appName": "BiblioScan",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#ecebe6"
+  }
+}

@@ -1,0 +1,153 @@
+/* BIBLIO/SCAN — ajustes para la app de Android. Se carga después de los estilos de index.html. */
+
+/* ---- panel Datos (importar / exportar) ---- */
+.datacard { width: min(560px, 94%); }
+.datab { padding: 14px 18px 4px; }
+.datab p { margin: 0 0 12px; line-height: 1.5; }
+.datab .lbl { color: var(--muted); margin: 16px 0 8px; }
+.datab .btns { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.datab .err { color: var(--orange); font-weight: 600; }
+.datab .hidden, #impAsk.hidden { display: none; }
+#impAsk { border-left: 3px solid var(--orange); padding-left: 12px; margin-top: 6px; }
+
+@media (max-width: 760px) {
+  html, body { height: 100%; }
+  body {
+    display: flex; flex-direction: column; padding: 0;
+    padding-top: env(safe-area-inset-top); font-size: 13px; background: var(--paper);
+  }
+  button, select, input[type=text] { font-size: 12px; padding: 9px 11px; }
+  input[type=text], .fields input { font-size: 16px; }   /* evita el zoom automático al escribir */
+
+  /* barra lateral → barra de pestañas inferior */
+  .side {
+    order: 2; flex: none; flex-direction: row; justify-content: center; padding: 6px 10px calc(6px + env(safe-area-inset-bottom));
+  }
+  .side-top { flex-direction: row; gap: 10px; }
+  .logo, .side-title, .arrow { display: none; }
+  .tabs { flex-direction: row; gap: 14px; }
+  .tabs button { width: 50px; height: 50px; }
+
+  .sheet, .catv, .libv { flex: 1; min-height: 0; }
+  .bar { height: 34px; padding: 0 12px; }
+  .intro { display: none; }
+
+  /* ---- escáner: cámara arriba, datos debajo, todo en una columna con scroll ---- */
+  .sheet { display: flex; flex-direction: column; overflow-y: auto; }
+  .sheet .col { flex: none; }
+  .sheet .col + .col { border-left: none; order: -1; border-bottom: 1px solid var(--rule); }
+  .view-head, .foot, table.spec, .controls .grow { display: none; }
+  .viewport { flex: none; height: 46vh; margin: 10px 12px 0; }
+  #view { width: 100%; height: 100%; object-fit: contain; }
+  #msg { max-width: 90%; font-size: 11px; padding: 10px 12px; }
+  .controls { gap: 8px; padding: 10px 12px 12px; }
+  .controls select { flex: 1 1 100%; }
+  .controls label.rng { flex: 1 1 40%; }
+  .controls input[type=range] { flex: 1; width: auto; }
+  #isbnIn { flex: 1 1 100%; width: auto; }
+  .duo > div { padding: 10px 12px; }
+  .big { font-size: 22px; }
+  .small { min-height: 0; }
+  .log { margin: 12px; flex: none; }
+  #text { max-height: 110px; }
+  .catalog { flex: none; }
+  #catList { max-height: none; overflow: visible; }
+
+  /* ---- catálogo ---- */
+  .catv { overflow-y: auto; }
+  .catv > .bar span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cat-head { display: block; }
+  .stats { grid-template-columns: repeat(2, 1fr); border-left: none; }
+  .stats > div { padding: 10px 12px; border-bottom: 1px solid var(--rule); }
+  .stats > div + div { border-left: none; }
+  .stats > div:nth-child(even) { border-left: 1px solid var(--rule); }
+  .stats .big, .stats #stYears { font-size: 26px; }
+  .filters { padding: 10px 12px; gap: 8px; }
+  #cq { min-width: 0; flex: 1 1 100%; font-size: 16px; }
+  .filters select { flex: 1 1 45%; max-width: none; min-width: 0; }
+  .timeline { padding: 8px 12px 0; }
+  .tlhead span:last-child { display: none; }
+  #tl { height: 90px; }
+  .tablewrap, .coverwrap { flex: none; overflow: visible; }
+  /* tabla: portada · título · autor · acciones */
+  .books th:nth-child(n+4):not(:last-child),
+  .books td:nth-child(n+4):not(:last-child) { display: none; }
+  .books th { position: static; }
+  .books td { padding: 8px 6px; }
+  .books .tt { font-size: 15px; }
+  .books .act button { font-size: 16px; padding: 4px 6px; }
+  .hero { grid-template-columns: 110px 1fr; gap: 16px; padding: 18px 12px; }
+  .hero .cv { width: 110px; box-shadow: 6px 6px 0 var(--orange); }
+  .hero h2 { font-size: 26px; }
+  .hero .facts { display: none; }
+  .hero .dots { display: none; }
+  .lanehead { margin: 0 12px; }
+  .strip, .grid { padding: 12px; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 16px 12px; }
+  .card { width: 104px; }
+
+  /* ---- ventanas ---- */
+  .modal { align-items: flex-end; }
+  .mcard, .dcard, .datacard { width: 100%; max-height: 92vh; overflow-y: auto; box-shadow: none; border-left: none; border-right: none; border-bottom: none; }
+  .mbody { grid-template-columns: 1fr; }
+  .cover { border-right: none; border-bottom: 1px solid var(--rule); min-height: 0; padding: 10px; }
+  .cover img { max-height: 150px; }
+  .fields { padding: 12px; }
+  .fields #fTitle { font-size: 20px; }
+  .mfoot { flex-wrap: wrap; padding: 12px; gap: 8px; }
+  .mfoot .q { flex: 1 1 100%; font-size: 20px; }
+  .mfoot button { flex: 1; }
+  .mfoot .grow { display: none; }
+  .dbody { display: block; overflow-y: auto; }
+  .dcover { padding: 18px 60px; }
+  .dinfo { padding: 16px 14px; overflow: visible; }
+  .dinfo h2 { font-size: 28px; }
+  .dfacts th { width: 96px; }
+
+  /* ---- biblioteca ---- */
+  .libv { overflow: hidden; }
+  .libtools { flex-wrap: wrap; gap: 10px; padding: 10px 12px; }
+  .libtools .lhint { display: none; }
+  .libtools .grow { display: none; }
+  .libtools #lq { flex: 1; width: auto; min-width: 0; font-size: 16px; }
+  .libstage { flex: 1; }
+  .sheet .col + .col > .bar { display: none; }
+
+  /* ---- navegador de baldas: ↑↓ balda · ←→ libro · el central crece y muestra el título ---- */
+  .libv.sbmode .libstage, .libv.sbmode #lAdd, .libv.sbmode .lhint, .libv.sbmode #lSnd { display: none; }
+  .libv:not(.sbmode) .sb { display: none; }
+  .sb { flex: 1; min-height: 0; overflow-y: auto; scroll-snap-type: y mandatory; overscroll-behavior: contain; }
+  .sbrow { height: 100%; scroll-snap-align: start; scroll-snap-stop: always; display: flex; flex-direction: column;
+           border-bottom: 1px solid var(--rule); position: relative; }
+  .sbhead { display: flex; justify-content: space-between; align-items: flex-start; padding: 16px 14px 0; }
+  .sbhead b { display: block; font: 500 28px/1 'Space Grotesk', sans-serif; letter-spacing: -.03em; text-transform: uppercase; }
+  .sbhead span { color: var(--muted); display: block; margin-top: 6px; }
+  .sbhead .sbn { margin-top: 4px; color: var(--ink); }
+  .sbstrip { flex: 1; min-height: 0; display: flex; align-items: flex-end; gap: 3px; overflow-x: auto; overflow-y: hidden;
+             scroll-snap-type: x mandatory; padding: 40px 0 0; scrollbar-width: none;
+             border-bottom: 8px solid var(--ink); margin: 0 0 0; }
+  .sbstrip::-webkit-scrollbar { display: none; }
+  .sbpad { flex: none; width: calc(50% - 20px); }
+  .sp { flex: none; width: var(--w); height: min(var(--hh), 320px); padding: 10px 0; border: 1px solid #b9b6ad; border-bottom: none;
+        background: var(--tone); color: var(--ink); scroll-snap-align: center; position: relative; overflow: hidden;
+        display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 8px;
+        transform-origin: 50% 100%; transition: transform .22s, background .22s, width .22s, box-shadow .22s;
+        text-transform: none; letter-spacing: 0; }
+  .sp:hover { background: var(--tone); color: var(--ink); }
+  .sp .spt, .sp .spa { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                       opacity: 0; transition: opacity .2s; }
+  .sp .spt { font: 500 15px 'Space Grotesk', sans-serif; letter-spacing: -.01em; max-height: 78%; }
+  .sp .spa { font: 500 9px 'IBM Plex Mono', monospace; letter-spacing: .08em; text-transform: uppercase; max-height: 20%; }
+  .sp::after { content: ''; position: absolute; left: 22%; right: 22%; top: 12px; height: 1px; background: #8f8c85; }
+  .sp.on { width: calc(var(--w) + 22px); transform: scale(1.12); background: var(--ink); color: var(--paper); border-color: var(--ink);
+           box-shadow: 0 -4px 0 var(--orange) inset; z-index: 1; }
+  .sp.on::after { display: none; }
+  .sp.on .spt, .sp.on .spa { opacity: 1; }
+  .sp.on .spa { color: var(--orange); }
+  .sbinfo { padding: 14px 14px 4px; min-height: 76px; }
+  .sbinfo .t { font: 500 20px/1.1 'Space Grotesk', sans-serif; letter-spacing: -.02em;
+               overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .sbinfo .a { color: var(--muted); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sbnext { padding: 6px 14px 12px; color: var(--muted); text-align: center; }
+  .sbempty { padding: 40px 18px; text-align: center; color: var(--muted); line-height: 1.6; }
+}

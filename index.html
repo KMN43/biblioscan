@@ -1417,7 +1417,7 @@ async function loadLibrary() {
       sh._sorted = sortedKind(sh);
       return sh;
     });
-    lib.W = lib.W || $('libStage').getBoundingClientRect().width || 1200;
+    lib.W = lib.W || $('libStage').offsetWidth || 1200;
     let widened = 0;
     for (const sh of lib.shelves) {
       const need = Math.ceil((Math.max(0, ...sh.rows.map((_, r) => rowUsed(sh, r))) + 2 * PAD) / G);
@@ -1606,7 +1606,8 @@ function animShelves() {
 
 // --- dibujo ---
 function libResize() {
-  const r = $('libStage').getBoundingClientRect();
+  // medidas de maquetación (sin transformaciones): en el móvil la biblioteca puede ir encogida con scale()
+  const st = $('libStage'), r = { width: st.offsetWidth, height: st.offsetHeight };
   lib.dpr = devicePixelRatio || 1; lib.W = Math.max(300, r.width); lib.H = Math.max(200, r.height);
   lc.width = lib.W * lib.dpr; lc.height = lib.H * lib.dpr;
   clampCam(); wake();
@@ -1806,7 +1807,10 @@ function hitShelfUi(x, y) {
   }
   return null;
 }
-const sPtr = e => { const r = lc.getBoundingClientRect(); return { sx: e.clientX - r.left, sy: e.clientY - r.top }; };
+const sPtr = e => {   // k ≠ 1 solo si la biblioteca va encogida (vista móvil)
+  const r = lc.getBoundingClientRect(), k = r.width / (lc.offsetWidth || r.width) || 1;
+  return { sx: (e.clientX - r.left) / k, sy: (e.clientY - r.top) / k };
+};
 lc.addEventListener('wheel', e => { e.preventDefault(); lib.cam -= e.deltaY; clampCam(); if (lib.ptr) moveAt(lib.ptr.sx, lib.ptr.sy); }, { passive: false });
 lc.addEventListener('pointerdown', e => {
   const { sx, sy } = sPtr(e), { x, y } = toWorld(sx, sy);

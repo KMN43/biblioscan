@@ -1,0 +1,5 @@
+node_modules/
+www/
+# firma de la app: NUNCA subir (guárdalos en un sitio seguro: sin ellos no podrás publicar actualizaciones)
+*.jks
+keystore.properties

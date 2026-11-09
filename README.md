@@ -22,15 +22,16 @@
    - [Biblioteca física](#3-biblioteca-física)
    - [Exportar y copias de seguridad](#4-exportar-y-copias-de-seguridad)
    - [Atajos de teclado](#atajos-de-teclado)
-3. [Conector MCP para Claude](#conector-mcp-para-claude)
-4. [Configuración avanzada](#configuración-avanzada)
-5. [Estructura del proyecto](#estructura-del-proyecto)
+3. [App para Android](#app-para-android)
+4. [Conector MCP para Claude](#conector-mcp-para-claude)
+5. [Configuración avanzada](#configuración-avanzada)
+6. [Estructura del proyecto](#estructura-del-proyecto)
 
 ---
 
 ## Instalación
 
-Hay tres formas de usarlo, de más fácil a más flexible.
+Hay tres formas de usarlo en el ordenador, de más fácil a más flexible. Para el móvil, consulta [App para Android](#app-para-android).
 
 ### A. Ejecutable para Windows (sin instalar nada)
 
@@ -151,6 +152,39 @@ Los enlaces están en la cabecera del Catálogo y en la lista del Escáner. Para
 
 ---
 
+## App para Android
+
+La misma app, adaptada a la pantalla del móvil. **Todo se guarda en el propio teléfono**: no hay cuentas ni servidor.
+
+**Instalación**
+
+1. Descarga `BiblioScan.apk` de la página de [Releases](../../releases) desde el móvil.
+2. Ábrelo. La primera vez Android pide permiso para *instalar apps de origen desconocido*: concédeselo al navegador o al gestor de archivos.
+3. Abre BiblioScan y permite el acceso a la cámara.
+
+**Diferencias con la versión del PC**
+
+- **Pestañas abajo** y escáner con la **cámara trasera**.
+- **Biblioteca en modo baldas**: desliza **arriba o abajo** para cambiar de balda y **a los lados** para recorrer los libros. El libro central se agranda y muestra su título en el lomo; **tócalo para abrir su ficha**. El buscador salta directamente al libro. Con **Ver plano** vuelves al plano de estanterías del PC (encogido para que quepa).
+- **Pestaña Datos** (icono de base de datos):
+  - **Importar** tu `biblioteca.db` del PC (o un `.json`), añadiéndolo a lo que ya tienes o reemplazándolo.
+  - **Exportar** a `.db`, CSV o JSON con el menú *Compartir* de Android (Drive, correo, WhatsApp…).
+  - El `.db` exportado se abre tal cual con `BiblioScan.exe`: es la forma de pasar la biblioteca entre el móvil y el PC.
+
+> Desinstalar la app borra su biblioteca. **Exporta una copia de vez en cuando.**
+
+**Compilar la APK desde el código** (JDK 21 y SDK de Android):
+
+```bash
+cd mobile
+npm install
+npm run apk
+```
+
+`npm run apk` genera `mobile/android/app/build/outputs/apk/release/app-release.apk`. Para firmarla hacen falta `mobile/keystore.properties` y el archivo `.jks`, que **no están en el repositorio**. Sin ellos, `cd android && gradlew assembleDebug` genera una versión de pruebas. La capa que sustituye al servidor Python está en `mobile/src/native.js` y los estilos de móvil en `mobile/src/mobile.css`.
+
+---
+
 ## Conector MCP para Claude
 
 `mcp_biblioteca.py` es un servidor [MCP](https://modelcontextprotocol.io) que permite a Claude (app de escritorio o Claude Code) **consultar tu biblioteca**. Abre la base de datos en **modo solo lectura**, así que no puede modificar nada. Tampoco necesita librerías externas.
@@ -230,6 +264,7 @@ biblioscan/
 ├── desktop.py          # Versión de escritorio con ventana propia (pywebview)
 ├── build_exe.py        # Genera BiblioScan.exe con PyInstaller
 ├── mcp_biblioteca.py   # Conector MCP de solo lectura para Claude
+├── mobile/             # App de Android (Capacitor): capa local SQLite, estilos de móvil y proyecto Android
 ├── biblioscan.ico      # Icono de la app
 ├── requirements.txt    # Dependencias de la versión de escritorio
 └── docs/img/           # Capturas de esta guía
