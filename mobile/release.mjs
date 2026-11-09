@@ -56,7 +56,8 @@ writeFileSync(gradlePath, gradle);
 // --- compilar ---
 run('node build-www.mjs');
 run('npx cap sync android');
-run(process.platform === 'win32' ? 'gradlew.bat assembleRelease' : './gradlew assembleRelease', { cwd: join(HERE, 'android'), env });
+// ruta explícita: en algunas consolas de Windows cmd no busca ejecutables en la carpeta actual
+run(process.platform === 'win32' ? `"${join(HERE, 'android', 'gradlew.bat')}" assembleRelease` : './gradlew assembleRelease', { cwd: join(HERE, 'android'), env });
 const apk = join(HERE, 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');
 if (!existsSync(apk)) fail('No se ha generado la APK.');
 copyFileSync(apk, join(ROOT, 'BiblioScan.apk'));
