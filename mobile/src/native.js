@@ -329,6 +329,8 @@
     grid: '<rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M4 10h16M4 15h16M10 4v16"/>',
     braces: '<path d="M9 4.5c-2 0-3 1-3 3v2c0 1.3-.8 2.2-2 2.5 1.2.3 2 1.2 2 2.5v2c0 2 1 3 3 3M15 4.5c2 0 3 1 3 3v2c0 1.3.8 2.2 2 2.5-1.2.3-2 1.2-2 2.5v2c0 2-1 3-3 3"/>',
     swap: '<path d="M4 8h14l-3.5-3.5M20 16H6l3.5 3.5"/>',
+    info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><circle cx="12" cy="7.9" r=".6" fill="currentColor"/>',
+    ext: '<path d="M14 4.5h5.5V10M19.5 4.5L11 13M17 14v5.5H4.5V7H10"/>',
   };
   const svg = n => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${IC[n]}</svg>`;
   const maskUrl = n => `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'>${IC[n].replace(/currentColor/g, 'black')}</svg>`)}")`;
@@ -347,17 +349,21 @@
     }
   }
 
-  // ------------------------------------------------------------ panel "Datos"
-  const ICON = svg('db');
+  // ------------------------------------------------------------ panel "Información" (versión, GitHub, actualizar, datos)
+  const ICON = svg('info');
   function buildPanel() {
     const nav = document.querySelector('.tabs');
     if (!nav || document.getElementById('tabData')) return;
-    nav.insertAdjacentHTML('beforeend', `<button id="tabData" title="Importar / exportar" aria-label="Datos">${ICON}</button>`);
+    nav.insertAdjacentHTML('beforeend', `<button id="tabData" title="Información, actualizaciones y copia de seguridad" aria-label="Información">${ICON}</button>`);
     document.body.insertAdjacentHTML('beforeend', `
       <div class="modal hidden" id="dataModal">
         <div class="mcard datacard">
-          <div class="bar mono-caps"><span>Datos · copia de seguridad</span><span id="dataCount"></span></div>
+          <div class="bar mono-caps"><span>Información</span><span id="dataCount"></span></div>
           <div class="datab">
+            <div class="infoh"><div class="ilogo">B/S</div><div><b>BiblioScan</b><span class="mono-caps">Versión ${escH(window.BIBLIO_VERSION || '—')}</span></div></div>
+            <a class="ilink mono-caps" href="https://github.com/KMN43/biblioscan" target="_blank" rel="noopener">${svg('ext')}<span>github.com/KMN43/biblioscan</span></a>
+            <div class="btns iupd">${ib('updCheck', 'rotate', 'Buscar actualizaciones')}<a id="updGet" class="ibtn primary" hidden aria-label="Descargar e instalar" title="Descargar e instalar">${svg('download')}</a><span id="updMsg" class="mono-caps"></span></div>
+            <div class="mono-caps lbl">Copia de seguridad</div>
             <p>Tu biblioteca se guarda solo en este móvil. Exporta una copia de vez en cuando, o pásala al ordenador
                (el archivo <b>.db</b> es el mismo <i>biblioteca.db</i> que usa BiblioScan.exe).</p>
             <div class="mono-caps lbl">Exportar</div>
@@ -384,6 +390,16 @@
       modal.classList.remove('hidden');
     };
     $('dataClose').onclick = close;
+    $('updCheck').onclick = async () => {
+      const msg = $('updMsg'), get = $('updGet');
+      msg.textContent = 'Buscando…'; get.hidden = true; $('updCheck').disabled = true;
+      try {
+        const u = await latestRelease();
+        if (u.apk && newer(u.tag, window.BIBLIO_VERSION)) { msg.textContent = `Nueva versión ${u.tag.replace(/^v/i, '')}`; get.href = u.apk; get.hidden = false; }
+        else msg.textContent = 'Tienes la última versión';
+      } catch { msg.textContent = 'Sin conexión con GitHub'; }
+      $('updCheck').disabled = false;
+    };
     modal.addEventListener('click', e => { if (e.target === modal) close(); });
     modal.querySelectorAll('[data-exp]').forEach(b => b.onclick = () => exportAs(b.dataset.exp));
     $('impPick').onclick = () => $('impFile').click();
@@ -569,8 +585,8 @@
     else if (MC.view === 'feed') body.innerHTML = list.map((b, i) => `
       <article class="mfc" data-isbn="${escH(b.isbn)}" style="background:${bgFor(b.isbn)}">
         <div class="mfk mono-caps"><span>${i + 1} / ${list.length}</span></div>
+        <div class="mft"><h2>${escH(b.title)}</h2></div>
         <div class="mfm">
-          <h2 style="font-size:${titleSize(b.title)}px">${escH(b.title)}</h2>
           <hr>
           <div class="mfa">${escH(b.authors || 'Autor desconocido')}</div>
           <div class="mfy mono-caps">${escH([b.year, b.publisher].filter(Boolean).join(' · '))}</div>
@@ -582,7 +598,39 @@
         <div class="a">${escH([b.authors, b.year].filter(Boolean).join(' · '))}</div></div>
         <button class="mld ibtn" aria-label="Opciones" title="Opciones">${svg('dots')}</button></div>`).join('');
     if (!$id('mcStatsP').hidden) mcStats();
+    if (MC.view === 'feed') observeTitles();
   }
+
+  // título del feed: el mayor tamaño que quepa en su hueco sin partir ninguna palabra
+  function fitTitle(card) {
+    const box = card.querySelector('.mft'), h2 = box?.querySelector('h2');
+    if (!h2 || !box.clientHeight) return;
+    const W = box.clientWidth, H = box.clientHeight;
+    const fits = px => { h2.style.fontSize = px + 'px'; return h2.scrollWidth <= W + 1 && h2.offsetHeight <= H; };
+    let lo = 14, hi = 190;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (fits(mid)) lo = mid; else hi = mid; }
+    fits(lo);
+    card.dataset.fit = `${W}x${H}`;
+  }
+  // ajusta la tarjeta visible y sus vecinas (al pintar, al desplazarse y al cambiar el tamaño)
+  function fitNear() {
+    const body = $id('mcBody'); if (!body || MC.view !== 'feed' || !body.clientHeight) return;
+    const cards = body.querySelectorAll('.mfc'), i = Math.round(body.scrollTop / body.clientHeight);
+    for (let k = Math.max(0, i - 1); k <= Math.min(cards.length - 1, i + 2); k++) {
+      const box = cards[k].querySelector('.mft');
+      if (cards[k].dataset.fit !== `${box.clientWidth}x${box.clientHeight}`) fitTitle(cards[k]);
+    }
+  }
+  function observeTitles() {
+    const body = $id('mcBody');
+    if (!body.dataset.fitBound) {
+      let t = 0; body.dataset.fitBound = '1';
+      body.addEventListener('scroll', () => { clearTimeout(t); t = setTimeout(fitNear, 40); }, { passive: true });
+    }
+    setTimeout(fitNear, 0);
+  }
+  document.fonts?.ready.then(() => { $id('mcBody')?.querySelectorAll('.mfc').forEach(c => { delete c.dataset.fit; }); fitNear(); });
+  addEventListener('resize', () => setTimeout(fitNear, 60));
 
   function mcStats() {
     const base = mcBase(), list = mcList();
@@ -637,7 +685,7 @@
     if (rest.length) out.push({ sid: null, r: 0, label: out.length ? 'Sin clasificar' : 'Mi biblioteca', sub: out.length ? 'En el montón' : 'Por autor', books: rest });
     return out;
   }
-  const spineHtml = b => { const h = hash(b.isbn), w = Math.max(14, Math.min(46, Math.round(thick(b) * 1.15)));
+  const spineHtml = b => { const h = hash(b.isbn), w = Math.max(26, Math.min(80, Math.round(thick(b) * 2)));
     return `<button class="sp" data-isbn="${escH(b.isbn)}" aria-label="${escH(b.title)}" style="--w:${w}px;--hh:${72 + (h >> 3) % 22}%"></button>`; };
 
   async function renderShelves(focus) {
@@ -653,6 +701,7 @@
         <div class="sbhead"><div><b>${escH(r.label)}</b><span class="mono-caps">${escH(r.sub)} · ${r.books.length} libros</span></div>
           <span class="mono-caps sbn">${i + 1} / ${sbRows.length}</span></div>
         <div class="sbstrip"><i class="sbpad"></i>${r.books.map(spineHtml).join('')}<i class="sbpad"></i></div>
+        <div class="sbshelf"></div>
         <div class="sbinfo"><h2 class="t"></h2><hr><div class="a"></div><div class="y mono-caps"></div></div>
         <div class="sbnext mono-caps">${i + 1 < sbRows.length ? `↓ ${escH(sbRows[i + 1].label)}` : i ? '↑ Fin de la biblioteca' : ''}</div>
       </section>`).join('');
@@ -836,16 +885,20 @@
   const REPO = 'KMN43/biblioscan';
   const vparts = v => String(v || '').replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
   const newer = (a, b) => { const x = vparts(a), y = vparts(b); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
+  async function latestRelease() {
+    const [, body] = await httpGet(`https://api.github.com/repos/${REPO}/releases/latest`);
+    const rel = JSON.parse(body), apk = (rel.assets || []).find(a => /\.apk$/i.test(a.name));
+    return { tag: rel.tag_name, apk: apk?.browser_download_url || null };
+  }
   async function checkUpdate() {
     const mine = window.BIBLIO_VERSION;
     if (!NATIVE || !mine) return;
     try {
-      const [, body] = await httpGet(`https://api.github.com/repos/${REPO}/releases/latest`);
-      const rel = JSON.parse(body), latest = rel.tag_name, apk = (rel.assets || []).find(a => /\.apk$/i.test(a.name));
+      const { tag: latest, apk } = await latestRelease();
       if (!apk || !newer(latest, mine) || lsGet('skipVersion', '') === latest) return;
       document.body.insertAdjacentHTML('beforeend', `
         <div id="upd" class="upd"><div><b>Nueva versión ${escH(latest.replace(/^v/i, ''))}</b><span class="mono-caps">Tienes la ${escH(mine)}</span></div>
-          <a class="ibtn primary" id="updGo" href="${escH(apk.browser_download_url)}" aria-label="Descargar e instalar" title="Descargar e instalar">${svg('download')}</a>
+          <a class="ibtn primary" id="updGo" href="${escH(apk)}" aria-label="Descargar e instalar" title="Descargar e instalar">${svg('download')}</a>
           ${ib('updNo', 'x', 'Ahora no')}</div>`);
       $id('updNo').onclick = () => { lsSet('skipVersion', latest); $id('upd').remove(); };
       $id('updGo').onclick = () => setTimeout(() => $id('upd')?.remove(), 500);

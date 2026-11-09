@@ -13,7 +13,17 @@
 .datacard { width: min(560px, 94%); }
 .datab { padding: 14px 18px 4px; }
 .datab p { margin: 0 0 12px; line-height: 1.5; }
-.datab .lbl { color: var(--muted); margin: 16px 0 8px; }
+.datab .lbl { color: var(--muted); margin: 18px 0 8px; padding-top: 14px; border-top: 1px solid #cfccc4; }
+.infoh { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.ilogo { width: 46px; height: 46px; background: var(--orange); display: flex; align-items: center; justify-content: center;
+         font: 700 16px 'Chakra Petch', sans-serif; flex: none; }
+.infoh b { display: block; font: 500 22px/1 'Space Grotesk', sans-serif; letter-spacing: -.02em; }
+.infoh span { display: block; color: var(--muted); margin-top: 5px; }
+.ilink { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--ink); padding-bottom: 2px; }
+.ilink .ic { width: 16px; height: 16px; }
+.iupd { align-items: center; margin-top: 14px; }
+.iupd #updMsg { color: var(--muted); }
+.iupd [hidden] { display: none; }
 .datab .btns { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
 .datab .hint { color: var(--muted); margin: 0 0 6px; }
 .datab .err { color: var(--orange); font-weight: 600; }
@@ -125,10 +135,12 @@
   /* tarjeta del feed: título grande, línea fina, detalles abajo */
   .mfc { height: 100%; scroll-snap-align: start; scroll-snap-stop: always; position: relative; display: flex; flex-direction: column;
          padding: 18px 20px 22px; border-bottom: 1px solid rgba(18,18,18,.12); overflow: hidden; }
-  .mfk { color: rgba(18,18,18,.55); }
-  .mfm { margin-top: auto; }
-  .mfc h2 { font-family: 'Space Grotesk', sans-serif; font-weight: 500; line-height: .98; letter-spacing: -.035em; margin: 0 0 18px;
-            overflow: hidden; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; }
+  .mfk { color: rgba(18,18,18,.55); flex: none; padding-right: 56px; }
+  /* el título ocupa todo el hueco libre: JS elige el mayor tamaño que cabe sin partir palabras */
+  .mft { flex: 1; min-height: 0; display: flex; align-items: flex-end; padding: 16px 0 18px; overflow: hidden; }
+  .mfc h2 { font-family: 'Space Grotesk', sans-serif; font-weight: 500; line-height: .92; letter-spacing: -.045em; margin: 0; width: 100%;
+            font-size: 40px; overflow-wrap: normal; word-break: keep-all; hyphens: none; -webkit-hyphens: none; }
+  .mfm { flex: none; }
   .mfc hr { border: none; border-top: 1px solid var(--ink); margin: 0 0 14px; }
   .mfa { font: 400 17px/1.25 'Space Grotesk', sans-serif; }
   .mfy { color: rgba(18,18,18,.6); margin-top: 8px; }
@@ -177,15 +189,16 @@
   .sbhead b { display: block; font: 500 26px/1 'Space Grotesk', sans-serif; letter-spacing: -.03em; }
   .sbhead span { color: var(--muted); display: block; margin-top: 6px; }
   .sbhead .sbn { margin-top: 4px; color: var(--ink); }
-  /* lomos: rectángulos lisos del mismo tono, con aire entre ellos; el central en naranja */
-  .sbstrip { flex: 1; min-height: 0; display: flex; align-items: center; gap: 7px; overflow-x: auto; overflow-y: hidden;
-             scroll-snap-type: x mandatory; padding: 18px 0; scrollbar-width: none; }
+  /* lomos: rectángulos lisos (sin redondear) del mismo tono, con aire entre ellos, apoyados en una balda gruesa */
+  .sbstrip { flex: 1; min-height: 0; display: flex; align-items: flex-end; gap: 7px; overflow-x: auto; overflow-y: hidden;
+             scroll-snap-type: x mandatory; padding: 24px 0 0; scrollbar-width: none; }
   .sbstrip::-webkit-scrollbar { display: none; }
-  .sbpad { flex: none; width: calc(50% - 16px); }
-  .sp { flex: none; width: var(--w); height: min(var(--hh), 300px); padding: 0; border: none; border-radius: 6px; background: #d9d6ce;
-        scroll-snap-align: center; transition: transform .22s, background .22s, opacity .2s; }
+  .sbshelf { flex: none; height: 14px; background: var(--ink); margin: 0 0 18px; }
+  .sbpad { flex: none; width: calc(50% - 28px); }
+  .sp { flex: none; width: var(--w); height: min(var(--hh), 320px); padding: 0; border: none; border-radius: 0; background: #d9d6ce;
+        scroll-snap-align: center; transform-origin: 50% 100%; transition: transform .22s, background .22s, opacity .2s; }
   .sp:hover { background: #d9d6ce; }
-  .sp.on, .sp.on:hover { background: var(--orange); transform: scaleY(1.06); }
+  .sp.on, .sp.on:hover { background: var(--orange); transform: scaleY(1.05); }
   .sp.lifted { opacity: .25; }
   .sbinfo { padding: 0 16px 6px; transition: transform .28s ease, opacity .2s; }
   .sbinfo .t { font-family: 'Space Grotesk', sans-serif; font-weight: 500; line-height: 1; letter-spacing: -.03em; margin: 0 0 14px;
@@ -209,7 +222,7 @@
   .sbt span { color: var(--muted); font-size: 9px; }
   .sbt.plus .ic { width: 30px; height: 30px; color: #9c998f; }
   .sbt.hov { border-color: var(--orange); border-style: solid; background: rgba(255,79,18,.12); transform: scale(1.04); }
-  .sbghost { position: fixed; left: 0; top: 0; z-index: 50; background: var(--orange); border-radius: 6px; pointer-events: none;
+  .sbghost { position: fixed; left: 0; top: 0; z-index: 50; background: var(--orange); border-radius: 0; pointer-events: none;
              box-shadow: 0 10px 24px rgba(18,18,18,.25); }
   .sbghost[hidden] { display: none; }
 }
