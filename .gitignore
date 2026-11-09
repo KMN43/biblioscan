@@ -1,0 +1,22 @@
+# --- Datos personales / locales (nunca subir) ---
+*.db
+*.db-journal
+.biblioscan-webview/
+
+# --- Binarios generados (BiblioScan.exe se publica como Release, no en el repo) ---
+*.exe
+build/
+dist/
+*.spec
+__pycache__/
+*.pyc
+
+# --- Otros proyectos de esta carpeta ---
+almacen-3d/
+
+# --- Configuración local ---
+.claude/
+
+# --- Bocetos de diseño ---
+opciones-lomos.html
+previews-lomos/
