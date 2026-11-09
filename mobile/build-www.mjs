@@ -18,7 +18,8 @@ const inject = (marker, extra, before = false) => {
 };
 html = html.replace(/<meta name="viewport"[^>]*>/, '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">');
 // la capa móvil va antes que cualquier otro script: tiene que interceptar fetch('/api/...') desde el principio
-inject('<meta charset="utf-8">', '\n<script src="capacitor.js"></script>\n<script src="vendor/sql-wasm.js"></script>\n<script src="native.js"></script>');
+const VERSION = JSON.parse(readFileSync(join(HERE, 'package.json'), 'utf8')).version;   // lo usa el aviso de nueva versión
+inject('<meta charset="utf-8">', `\n<script>window.BIBLIO_VERSION = '${VERSION}';</script>` + '\n<script src="capacitor.js"></script>\n<script src="vendor/sql-wasm.js"></script>\n<script src="native.js"></script>');
 inject('</head>', '<link rel="stylesheet" href="mobile.css">\n', true);
 writeFileSync(join(WWW, 'index.html'), html);
 

@@ -103,8 +103,6 @@
     }
     return { shelves };
   }
-  // ancho (px) que necesitan las estanterías: lo usa la vista móvil para encoger la biblioteca y que quepa
-  const libWidth = lib => Math.max(0, ...(lib.shelves || []).map(s => (s.x + s.w) * 20 + 20));
 
   // ------------------------------------------------------------ búsqueda ISBN
   const UA = 'Mozilla/5.0 (Linux; Android 14) BiblioScan/1.0';
@@ -206,13 +204,11 @@
     }
     if (path === '/api/library' && method === 'GET') {
       const lib = getLibrary();
-      window.BIBLIO_MOBILE.libWidth = libWidth(lib);
       return json(lib);
     }
     if (path === '/api/library' && method === 'PUT') {
       let data; try { data = cleanLibrary(JSON.parse(body || '{}')); } catch { return json({ error: 'JSON no válido' }, 400); }
       setLibrary(data); persist();
-      window.BIBLIO_MOBILE.libWidth = libWidth(data);
       return json({ ok: true, shelves: data.shelves.length });
     }
     if (path === '/api/lookup') {
@@ -308,8 +304,51 @@
     } catch (e) { db.run('ROLLBACK'); throw e; }
   }
 
+  // ------------------------------------------------------------ iconos (los botones del móvil van sin texto)
+  const IC = {
+    db: '<ellipse cx="12" cy="5.5" rx="7" ry="2.5"/><path d="M5 5.5v13c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-13"/><path d="M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5"/>',
+    filter: '<path d="M4 6.5h16M7.5 12h9M10.5 17.5h3"/>',
+    chart: '<rect x="4" y="9" width="3.2" height="10" rx="1.6"/><rect x="10.4" y="4.5" width="3.2" height="14.5" rx="1.6"/><rect x="16.8" y="11.5" width="3.2" height="7.5" rx="1.6"/>',
+    list: '<path d="M5 7h14M5 12h14M5 17h9"/>',
+    feed: '<rect x="6" y="3.5" width="12" height="17" rx="2.5"/><path d="M9 14.5h6M9 17h4"/>',
+    image: '<rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M4.5 17.5l4.5-4.5 3.5 3.5 2.5-2.5 4.5 4.5"/>',
+    dots: '<circle cx="5.5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="18.5" cy="12" r="1.2" fill="currentColor"/>',
+    eye: '<path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/>',
+    edit: '<path d="M4 20h4L19.5 8.5l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/>',
+    trash: '<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/>',
+    x: '<path d="M6 6l12 12M18 6L6 18"/>',
+    check: '<path d="M4.5 12.5l5 5L19.5 7"/>',
+    prev: '<path d="M15 5l-7 7 7 7"/>', next: '<path d="M9 5l7 7-7 7"/>',
+    pause: '<path d="M8.5 5v14M15.5 5v14"/>', play: '<path d="M7.5 5l11 7-11 7z"/>',
+    rotate: '<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4v4h-4"/>',
+    contrast: '<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/>',
+    text: '<path d="M5 6.5h14M12 6.5V19M9 19h6"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    upload: '<path d="M12 19V8M7 12.5l5-5 5 5M5 4.5h14"/>',
+    download: '<path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/>',
+    grid: '<rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M4 10h16M4 15h16M10 4v16"/>',
+    braces: '<path d="M9 4.5c-2 0-3 1-3 3v2c0 1.3-.8 2.2-2 2.5 1.2.3 2 1.2 2 2.5v2c0 2 1 3 3 3M15 4.5c2 0 3 1 3 3v2c0 1.3.8 2.2 2 2.5-1.2.3-2 1.2-2 2.5v2c0 2-1 3-3 3"/>',
+    swap: '<path d="M4 8h14l-3.5-3.5M20 16H6l3.5 3.5"/>',
+  };
+  const svg = n => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${IC[n]}</svg>`;
+  const maskUrl = n => `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'>${IC[n].replace(/currentColor/g, 'black')}</svg>`)}")`;
+  const ib = (id, icon, label, extra = '') => `<button id="${id}" class="ibtn" aria-label="${label}" title="${label}" ${extra}>${svg(icon)}</button>`;
+  // botones de index.html: su texto lo cambia la propia app (p. ej. «Pausa»/«Reanudar»), así que el icono va por CSS (máscara)
+  function iconizeButtons() {
+    const map = { filterBtn: ['contrast', 'Filtro de imagen'], rotBtn: ['rotate', 'Girar texto OCR'], pauseBtn: ['pause', 'Pausa', 'play'],
+      dPrev: ['prev', 'Anterior'], dNext: ['next', 'Siguiente'], dEdit: ['edit', 'Editar ficha'], dClose: ['x', 'Cerrar'],
+      mOcr: ['text', 'Usar texto OCR'], mNo: ['x', 'Descartar'], mYes: ['check', 'Guardar'] };
+    for (const [id, [icon, label, on]] of Object.entries(map)) {
+      const b = document.getElementById(id);
+      if (!b) continue;
+      b.classList.add('icb'); b.setAttribute('aria-label', label); b.title = label;
+      b.style.setProperty('--ic', maskUrl(icon));
+      if (on) b.style.setProperty('--ic-on', maskUrl(on));
+    }
+  }
+
   // ------------------------------------------------------------ panel "Datos"
-  const ICON = '<svg viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="7" ry="2.5"/><path d="M5 5.5v13c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-13"/><path d="M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5"/></svg>';
+  const ICON = svg('db');
   function buildPanel() {
     const nav = document.querySelector('.tabs');
     if (!nav || document.getElementById('tabData')) return;
@@ -322,17 +361,18 @@
             <p>Tu biblioteca se guarda solo en este móvil. Exporta una copia de vez en cuando, o pásala al ordenador
                (el archivo <b>.db</b> es el mismo <i>biblioteca.db</i> que usa BiblioScan.exe).</p>
             <div class="mono-caps lbl">Exportar</div>
-            <div class="btns"><button data-exp="db" class="primary">Base de datos .db</button><button data-exp="csv">CSV (Excel)</button><button data-exp="json">JSON</button></div>
+            <div class="btns"><button data-exp="db" class="ibtn primary" aria-label="Exportar base de datos .db" title="Base de datos .db">${svg('db')}</button><button data-exp="csv" class="ibtn" aria-label="Exportar CSV para Excel" title="CSV (Excel)">${svg('grid')}</button><button data-exp="json" class="ibtn" aria-label="Exportar JSON" title="JSON">${svg('braces')}</button></div>
+            <p class="hint mono-caps">.db · csv · json</p>
             <div class="mono-caps lbl">Importar</div>
             <p>Elige un <b>biblioteca.db</b> (del ordenador o de otro móvil) o un <b>.json</b> exportado de BiblioScan.</p>
-            <div class="btns"><button id="impPick">Elegir archivo…</button><input id="impFile" type="file" hidden></div>
+            <div class="btns">${ib('impPick', 'upload', 'Elegir archivo')}<input id="impFile" type="file" hidden></div>
             <div id="impAsk" class="hidden">
               <p id="impMsg"></p>
-              <div class="btns"><button id="impAdd" class="primary">Añadir a mi biblioteca</button><button id="impRep">Reemplazar todo</button></div>
+              <div class="btns">${ib('impAdd', 'plus', 'Añadir a mi biblioteca', 'data-pri')}${ib('impRep', 'swap', 'Reemplazar todo')}</div>
             </div>
             <p id="impErr" class="err"></p>
           </div>
-          <div class="mfoot"><span class="grow"></span><button id="dataClose">Cerrar</button></div>
+          <div class="mfoot"><span class="grow"></span>${ib('dataClose', 'x', 'Cerrar')}</div>
         </div>
       </div>`);
     const $ = id => document.getElementById(id), modal = $('dataModal');
@@ -356,8 +396,8 @@
         pending = await readImport(f);
         const have = rows('SELECT count(*) n FROM books')[0].n, sh = pending.library?.shelves?.length || 0;
         $('impMsg').innerHTML = `<b>${f.name}</b>: ${pending.books.length} libros${sh ? ` y ${sh} estanterías` : ''}.<br>`
-          + `Ahora tienes ${have} libros. «Añadir» combina ambos (si un ISBN ya existe, se actualiza con los datos importados)`
-          + `${sh ? ' y solo toma las estanterías si aún no tienes ninguna' : ''}. «Reemplazar» borra lo actual.`;
+          + `Ahora tienes ${have} libros. ＋ combina ambos (si un ISBN ya existe, se actualiza con los datos importados)`
+          + `${sh ? ' y solo toma las estanterías si aún no tienes ninguna' : ''}. ⇄ reemplaza y borra lo actual.`;
         $('impAsk').classList.remove('hidden');
       } catch (err) { $('impErr').textContent = err.message || String(err); }
     };
@@ -382,109 +422,397 @@
     };
   }
 
-  // la biblioteca se dibuja con las medidas del PC; en pantalla estrecha se encoge para que quepan las estanterías
   const narrow = matchMedia('(max-width: 760px)');
-  function fitLibrary() {
-    const stage = document.getElementById('libStage'), view = document.getElementById('libView');
-    if (!stage || !view || view.classList.contains('hidden')) return;
-    if (!narrow.matches) { stage.style.cssText = ''; return; }
-    const availW = view.clientWidth;
-    const top = [...view.children].filter(el => el !== stage).reduce((h, el) => h + el.offsetHeight, 0);
-    const availH = Math.max(200, view.clientHeight - top);
-    const need = Math.max(availW, window.BIBLIO_MOBILE.libWidth || 0), k = availW / need;
-    stage.style.cssText = `flex:none;width:${need}px;height:${availH / k}px;transform:scale(${k});transform-origin:0 0;`;
-  }
-  // antes que los manejadores de index.html (este script se carga primero)
-  addEventListener('resize', fitLibrary);
-  document.addEventListener('click', e => { if (e.target.closest?.('#tabLib')) requestAnimationFrame(() => { fitLibrary(); dispatchEvent(new Event('resize')); }); }, true);
-
-  // ------------------------------------------------------------ navegador de baldas (Biblioteca en el móvil)
-  // ↑ ↓ cambia de balda · ← → recorre los libros · el del centro se agranda y muestra el título · tocarlo abre la ficha
+  const $id = id => document.getElementById(id);
   const escH = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const TONES = ['#d6d3cb', '#cfccc3', '#c7c4bb', '#dedbd3', '#bfbcb3', '#d2cfc6'];
+  const normS = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   const hash = s => { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
+  const yearOfB = b => { const m = String(b.year || '').match(/\d{4}/); return m ? +m[0] : null; };
   const surname = a => (String(a || '').split(',')[0].trim().split(/\s+/).pop() || '');
-  let sbMode = (() => { try { return localStorage.getItem('libMode') || 'baldas'; } catch { return 'baldas'; } })();
+  const lsGet = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+  const books = () => (typeof catalog !== 'undefined' && Array.isArray(catalog)) ? catalog : [];
+  let toastT = 0;
+  function mtoast(msg) {
+    let t = $id('mToast');
+    if (!t) { document.body.insertAdjacentHTML('beforeend', '<div id="mToast" class="mono-caps"></div>'); t = $id('mToast'); }
+    t.textContent = msg; t.classList.add('on');
+    clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2200);
+  }
+
+  // ============================================================ CATÁLOGO (móvil)
+  const MC = { view: lsGet('mcView', 'feed'), q: '', pub: '', lang: '', sort: 'rec', yr: null };
+  const SORTS = [['rec', 'Recomendados'], ['recent', 'Añadidos recientes'], ['title', 'Título A–Z'], ['author', 'Autor A–Z'], ['new', 'Año: nuevos'], ['old', 'Año: antiguos']];
+
+  function mcBase() {   // todos los filtros menos el del año (el timeline muestra la distribución sin él)
+    const terms = normS(MC.q).split(/\s+/).filter(Boolean);
+    return books().filter(b => (!MC.pub || b.publisher === MC.pub) && (!MC.lang || b.language === MC.lang)
+      && (!terms.length || terms.every(t => normS([b.title, b.subtitle, b.authors, b.publisher, b.isbn, b.notes, b.year].join(' ')).includes(t))));
+  }
+  function mcList() {
+    let list = mcBase();
+    if (MC.yr) list = list.filter(b => { const y = yearOfB(b); return y && y >= MC.yr[0] && y <= MC.yr[1]; });
+    const day = new Date().toISOString().slice(0, 10), cmp = (a, b) => String(a || '').localeCompare(String(b || ''), 'es');
+    const by = {
+      rec: (a, b) => hash(a.isbn + day) - hash(b.isbn + day),
+      recent: (a, b) => cmp(b.created_at || b.updated_at, a.created_at || a.updated_at),
+      title: (a, b) => cmp(a.title, b.title),
+      author: (a, b) => cmp(surname(a.authors), surname(b.authors)) || cmp(a.title, b.title),
+      new: (a, b) => (yearOfB(b) || 0) - (yearOfB(a) || 0),
+      old: (a, b) => (yearOfB(a) || 9999) - (yearOfB(b) || 9999),
+    }[MC.sort];
+    return [...list].sort(by);
+  }
+
+  const BG = ['rgba(255,79,18,.34)', 'rgba(255,128,74,.30)', 'rgba(255,186,150,.45)', 'rgba(18,18,18,.10)', 'rgba(205,201,190,.75)', 'rgba(255,79,18,.18)'];
+  function bgFor(isbn) {   // degradado difuso aleatorio (pero estable por libro) con la paleta de la app
+    let h = hash(isbn); const r = () => { h = Math.imul(h ^ (h >>> 15), 2246822507) >>> 0; return (h % 1000) / 1000; };
+    const blob = () => `radial-gradient(circle at ${Math.round(r() * 100)}% ${Math.round(r() * 100)}%, ${BG[Math.floor(r() * BG.length)]} 0, transparent ${Math.round(45 + r() * 25)}%)`;
+    return `${blob()}, ${blob()}, ${blob()}, #ecebe6`;
+  }
+  const titleSize = t => { const n = String(t || '').length; return n < 18 ? 46 : n < 34 ? 38 : n < 60 ? 30 : 24; };
+
+  function buildMobileCatalog() {
+    const cv = $id('catView');
+    if (!cv || $id('mcat')) return;
+    cv.insertAdjacentHTML('beforeend', `
+      <div id="mcat">
+        <div class="mchead">
+          <div class="mct"><b>Catálogo</b><span id="mcCount" class="mono-caps"></span></div>
+          <div class="mcbtns">${ib('mcFilt', 'filter', 'Buscar y filtrar')}${ib('mcStatsB', 'chart', 'Estadísticas y línea de tiempo')}${ib('mcViewB', 'list', 'Cambiar vista')}</div>
+        </div>
+        <div id="mcFilters" class="mcpanel" hidden>
+          <input id="mcQ" type="text" placeholder="Buscar título, autor, editorial, ISBN…" autocomplete="off">
+          <div class="mcsel"><select id="mcPub" aria-label="Editorial"></select><select id="mcLang" aria-label="Idioma"></select>
+            <select id="mcSort" aria-label="Orden">${SORTS.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>
+            ${ib('mcClear', 'x', 'Quitar filtros')}</div>
+        </div>
+        <div id="mcStatsP" class="mcpanel" hidden>
+          <div class="mckpis" id="mcKpis"></div>
+          <div class="mctl"><div class="mctlh mono-caps"><span>Año de edición</span><span id="mcTlInfo"></span></div><svg id="mcTl"></svg>
+            <div class="mctlx mono-caps"><span id="mcTl0"></span><span id="mcTl1"></span></div></div>
+        </div>
+        <div id="mcBody" class="mcbody"></div>
+      </div>
+      <div id="mcSheet" class="msheet" hidden><div class="msin"><div class="msh"><b id="mcSheetT"></b><span id="mcSheetA" class="mono-caps"></span></div>
+        <div class="msb">${ib('mcSView', 'eye', 'Ver ficha')}${ib('mcSEdit', 'edit', 'Editar')}${ib('mcSDel', 'trash', 'Borrar')}${ib('mcSClose', 'x', 'Cerrar')}</div></div></div>
+      <div id="mcCover" class="mcover" hidden></div>`);
+    document.body.append($id('mcSheet'), $id('mcCover'));   // fuera de #catView (allí todo lo demás va oculto)
+    const toggle = (btn, panel) => { const p = $id(panel); p.hidden = !p.hidden; $id(btn).classList.toggle('on', !p.hidden); if (panel === 'mcStatsP' && !p.hidden) mcStats(); };
+    $id('mcFilt').onclick = () => { toggle('mcFilt', 'mcFilters'); if (!$id('mcFilters').hidden) $id('mcQ').focus(); };
+    $id('mcStatsB').onclick = () => toggle('mcStatsB', 'mcStatsP');
+    $id('mcViewB').onclick = () => { MC.view = MC.view === 'feed' ? 'list' : 'feed'; lsSet('mcView', MC.view); mcRender(); };
+    let qT = 0;
+    $id('mcQ').oninput = e => { clearTimeout(qT); qT = setTimeout(() => { MC.q = e.target.value; mcRender(); }, 180); };
+    $id('mcPub').onchange = e => { MC.pub = e.target.value; mcRender(); };
+    $id('mcLang').onchange = e => { MC.lang = e.target.value; mcRender(); };
+    $id('mcSort').onchange = e => { MC.sort = e.target.value; mcRender(); };
+    $id('mcClear').onclick = () => { Object.assign(MC, { q: '', pub: '', lang: '', sort: 'rec', yr: null }); $id('mcQ').value = ''; mcRender(); };
+    $id('mcBody').addEventListener('click', e => {
+      const cov = e.target.closest('.mfcov'), dots = e.target.closest('.mld'), item = e.target.closest('[data-isbn]');
+      if (!item) return;
+      const isbn = item.dataset.isbn;
+      if (cov) return showCover(isbn);
+      if (dots) return openSheet(isbn);
+      if (typeof openDetail === 'function') openDetail(isbn, mcList().map(b => b.isbn));
+    });
+    // hoja de acciones (los ⋯ de la lista): evita borrar o editar sin querer
+    let sheetIsbn = null;
+    function openSheet(isbn) {
+      const b = books().find(x => x.isbn === isbn); if (!b) return;
+      sheetIsbn = isbn; $id('mcSheetT').textContent = b.title; $id('mcSheetA').textContent = [b.authors, b.year].filter(Boolean).join(' · ');
+      $id('mcSheet').hidden = false;
+    }
+    const closeSheet = () => { $id('mcSheet').hidden = true; sheetIsbn = null; };
+    $id('mcSheet').addEventListener('click', e => { if (e.target.id === 'mcSheet') closeSheet(); });
+    $id('mcSClose').onclick = closeSheet;
+    $id('mcSView').onclick = () => { const i = sheetIsbn; closeSheet(); openDetail(i, mcList().map(b => b.isbn)); };
+    $id('mcSEdit').onclick = () => { const i = sheetIsbn; closeSheet(); try { handled.delete(i); } catch {} openConfirm(i); };
+    $id('mcSDel').onclick = async () => {
+      const b = books().find(x => x.isbn === sheetIsbn); if (!b) return;
+      if (!confirm(`¿Borrar «${b.title}» del catálogo?`)) return;
+      const i = sheetIsbn; closeSheet();
+      await fetch(`/api/books/${encodeURIComponent(i)}`, { method: 'DELETE' });
+      loadCatalog(); mtoast('Libro borrado');
+    };
+    $id('mcCover').onclick = () => { $id('mcCover').hidden = true; };
+    // el catálogo se vuelve a pintar cada vez que index.html recarga los libros
+    new MutationObserver(() => { mcRender(); if (!$id('libView').classList.contains('hidden')) renderShelves(); }).observe($id('catCount'), { childList: true, characterData: true, subtree: true });
+    mcRender();
+  }
+
+  function showCover(isbn) {
+    const b = books().find(x => x.isbn === isbn); if (!b) return;
+    const c = $id('mcCover');
+    c.innerHTML = `<div class="mcovin">${typeof coverHtml === 'function' ? coverHtml(b, true) : `<img src="${escH(b.cover_url)}" alt="">`}</div>`;
+    c.querySelectorAll('img').forEach(img => { img.style.filter = 'none'; img.onerror = () => img.remove(); });
+    c.hidden = false;
+  }
+
+  function mcFillSelects() {
+    const base = books(), count = k => base.reduce((m, b) => (b[k] && m.set(b[k], (m.get(b[k]) || 0) + 1), m), new Map());
+    const opts = (m, all) => `<option value="">${all}</option>` + [...m].sort((a, b) => a[0].localeCompare(b[0], 'es')).map(([v, n]) => `<option value="${escH(v)}">${escH(v)} (${n})</option>`).join('');
+    $id('mcPub').innerHTML = opts(count('publisher'), 'Todas las editoriales'); $id('mcPub').value = MC.pub;
+    $id('mcLang').innerHTML = opts(count('language'), 'Todos los idiomas'); $id('mcLang').value = MC.lang;
+    $id('mcSort').value = MC.sort;
+  }
+
+  function mcRender() {
+    const body = $id('mcBody'); if (!body) return;
+    mcFillSelects();
+    const list = mcList(), all = books().length, filtered = list.length !== all;
+    $id('mcCount').textContent = filtered ? `${list.length} de ${all}` : `${all} libros`;
+    $id('mcFilt').classList.toggle('dot', !!(MC.q || MC.pub || MC.lang || MC.yr || MC.sort !== 'rec'));
+    $id('mcViewB').innerHTML = svg(MC.view === 'feed' ? 'list' : 'feed');
+    body.className = 'mcbody ' + MC.view;
+    if (!list.length) body.innerHTML = `<div class="sbempty mono-caps">${all ? 'Ningún libro coincide con los filtros.' : 'Aún no hay libros. Escanea alguno o importa tu biblioteca desde Datos.'}</div>`;
+    else if (MC.view === 'feed') body.innerHTML = list.map((b, i) => `
+      <article class="mfc" data-isbn="${escH(b.isbn)}" style="background:${bgFor(b.isbn)}">
+        <div class="mfk mono-caps"><span>${i + 1} / ${list.length}</span></div>
+        <div class="mfm">
+          <h2 style="font-size:${titleSize(b.title)}px">${escH(b.title)}</h2>
+          <hr>
+          <div class="mfa">${escH(b.authors || 'Autor desconocido')}</div>
+          <div class="mfy mono-caps">${escH([b.year, b.publisher].filter(Boolean).join(' · '))}</div>
+        </div>
+        <button class="mfcov ibtn" aria-label="Ver portada" title="Ver portada">${svg('image')}</button>
+      </article>`).join('');
+    else body.innerHTML = list.map(b => `
+      <div class="mlr" data-isbn="${escH(b.isbn)}"><div class="mlt"><div class="t">${escH(b.title)}</div>
+        <div class="a">${escH([b.authors, b.year].filter(Boolean).join(' · '))}</div></div>
+        <button class="mld ibtn" aria-label="Opciones" title="Opciones">${svg('dots')}</button></div>`).join('');
+    if (!$id('mcStatsP').hidden) mcStats();
+  }
+
+  function mcStats() {
+    const base = mcBase(), list = mcList();
+    const authors = new Set(list.flatMap(b => String(b.authors || '').split(',').map(s => s.trim()).filter(Boolean)));
+    const pubs = new Set(list.map(b => b.publisher).filter(Boolean));
+    const pages = list.reduce((n, b) => n + (parseInt(b.pages, 10) || 0), 0);
+    const k = (v, l) => `<div class="mck"><span class="mono-caps">${l}</span><b>${v.toLocaleString('es-ES')}</b></div>`;
+    $id('mcKpis').innerHTML = k(list.length, 'Libros') + k(authors.size, 'Autores') + k(pubs.size, 'Editoriales') + k(pages, 'Páginas');
+    // línea de tiempo: píldoras centradas, alto según el nº de libros de cada año (o lustro, si el periodo es largo)
+    const ys = base.map(yearOfB).filter(Boolean), svgEl = $id('mcTl'), W = svgEl.clientWidth || 340, H = 96;
+    if (!ys.length) { svgEl.innerHTML = ''; $id('mcTl0').textContent = $id('mcTl1').textContent = ''; $id('mcTlInfo').textContent = 'Sin años'; return; }
+    const lo = Math.min(...ys), hi = Math.max(...ys), step = hi - lo > 36 ? 5 : 1, start = Math.floor(lo / step) * step;
+    const n = Math.floor((hi - start) / step) + 1, cnt = Array(n).fill(0);
+    ys.forEach(y => cnt[Math.floor((y - start) / step)]++);
+    const max = Math.max(...cnt), slot = W / n, bw = Math.max(3, Math.min(16, slot * .62));
+    svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svgEl.innerHTML = cnt.map((c, i) => {
+      const y0 = start + i * step, y1 = y0 + step - 1, on = MC.yr && MC.yr[0] === y0;
+      if (!c) return `<circle cx="${slot * i + slot / 2}" cy="${H / 2}" r="1.2" fill="#c9c6bd"/>`;
+      const h = Math.max(bw, (c / max) * (H - 8)), fill = on ? '#121212' : MC.yr ? '#d6d3cb' : '#ff4f12';
+      return `<rect data-y0="${y0}" data-y1="${y1}" x="${slot * i + (slot - bw) / 2}" y="${(H - h) / 2}" width="${bw}" height="${h}" rx="${bw / 2}" fill="${fill}"><title>${step > 1 ? `${y0}–${y1}` : y0}: ${c}</title></rect>`
+        + `<rect data-y0="${y0}" data-y1="${y1}" x="${slot * i}" y="0" width="${slot}" height="${H}" fill="transparent"/>`;
+    }).join('');
+    $id('mcTl0').textContent = start; $id('mcTl1').textContent = start + (n - 1) * step + step - 1;
+    $id('mcTlInfo').innerHTML = MC.yr ? `${MC.yr[0]}${MC.yr[1] !== MC.yr[0] ? '–' + MC.yr[1] : ''} · ${list.length} <u data-clr>quitar</u>` : 'Toca un año para filtrar';
+    svgEl.onclick = e => {
+      const r = e.target.closest('[data-y0]'); if (!r) return;
+      const y0 = +r.dataset.y0, y1 = +r.dataset.y1;
+      MC.yr = MC.yr && MC.yr[0] === y0 ? null : [y0, y1]; mcRender();
+    };
+    $id('mcTlInfo').onclick = e => { if (e.target.closest('[data-clr]')) { MC.yr = null; mcRender(); } };
+  }
+
+  // ============================================================ BIBLIOTECA · baldas (móvil)
+  // ↑↓ cambia de balda · ←→ recorre los libros · tocar el central abre su ficha
+  // mantener pulsado el central → aparecen las baldas como destinos: arrástralo a una (o a «+» para crear otra)
   let sbRows = [];
+  const thick = b => { const p = parseInt(b?.pages, 10); return p ? Math.max(7, Math.min(40, Math.round(5 + p / 18))) : 15; };
+  const nRowsOf = s => Math.max(1, Math.round((s.h || 6) / 6));
+  const entries = row => row.map(e => Array.isArray(e) ? e : [e, 0]);
 
   async function shelfRows() {
     await ready;
-    const books = allBooks(), byIsbn = new Map(books.map(b => [b.isbn, b])), placed = new Set(), out = [];
-    const lib = cleanLibrary(getLibrary());
-    for (const s of lib.shelves) s.books.forEach((row, r) => {
-      const list = row.map(e => Array.isArray(e) ? e : [e, 0]).sort((a, b) => a[1] - b[1])
-        .map(e => byIsbn.get(e[0])).filter(b => b && !placed.has(b.isbn));
+    const all = allBooks(), byIsbn = new Map(all.map(b => [b.isbn, b])), placed = new Set(), out = [];
+    for (const s of cleanLibrary(getLibrary()).shelves) s.books.forEach((row, r) => {
+      const list = entries(row).sort((a, b) => a[1] - b[1]).map(e => byIsbn.get(e[0])).filter(b => b && !placed.has(b.isbn));
       list.forEach(b => placed.add(b.isbn));
-      if (list.length) out.push({ label: s.label || 'Sin etiqueta', sub: `Balda ${r + 1}`, books: list });
+      if (list.length) out.push({ sid: s.id, r, label: s.label || 'Sin etiqueta', sub: nRowsOf(s) > 1 ? `Balda ${r + 1}` : 'Balda', books: list });
     });
-    const rest = books.filter(b => !placed.has(b.isbn))
+    const rest = all.filter(b => !placed.has(b.isbn))
       .sort((a, b) => surname(a.authors).localeCompare(surname(b.authors), 'es') || String(a.title).localeCompare(String(b.title), 'es'));
-    if (rest.length) out.push({ label: out.length ? 'Sin clasificar' : 'Mi biblioteca', sub: out.length ? 'En el montón' : 'Por autor', books: rest });
+    if (rest.length) out.push({ sid: null, r: 0, label: out.length ? 'Sin clasificar' : 'Mi biblioteca', sub: out.length ? 'En el montón' : 'Por autor', books: rest });
     return out;
   }
+  const spineHtml = b => { const h = hash(b.isbn), w = Math.max(14, Math.min(46, Math.round(thick(b) * 1.15)));
+    return `<button class="sp" data-isbn="${escH(b.isbn)}" aria-label="${escH(b.title)}" style="--w:${w}px;--hh:${72 + (h >> 3) % 22}%"></button>`; };
 
-  function spineHtml(b) {
-    const p = parseInt(b.pages, 10), w = p ? Math.max(24, Math.min(64, Math.round(16 + p / 12))) : 34, h = hash(b.isbn);
-    return `<button class="sp" data-isbn="${escH(b.isbn)}" style="--w:${w}px;--tone:${TONES[h % TONES.length]};--hh:${88 + (h >> 4) % 12}%">`
-      + `<span class="spt">${escH(b.title)}</span><span class="spa">${escH(surname(b.authors))}</span></button>`;
-  }
-
-  async function renderShelves() {
-    const sb = document.getElementById('sb');
-    if (!sb) return;
+  async function renderShelves(focus) {
+    const sb = $id('sb'); if (!sb) return;
+    if (!focus) {   // conserva la balda y el libro que estabas mirando
+      const sec = [...sb.querySelectorAll('.sbrow')].find(s => Math.abs(s.offsetTop - sb.scrollTop) < s.offsetHeight / 2);
+      if (sec) focus = { sid: sbRows[+sec.dataset.row]?.sid, r: sbRows[+sec.dataset.row]?.r, isbn: sec.querySelector('.sp.on')?.dataset.isbn };
+    }
     sbRows = await shelfRows();
-    if (!sbRows.length) { sb.innerHTML = '<div class="sbempty mono-caps">Aún no hay libros. Escanea alguno o importa tu biblioteca desde «Datos».</div>'; return; }
+    if (!sbRows.length) { sb.innerHTML = '<div class="sbempty mono-caps">Aún no hay libros. Escanea alguno o importa tu biblioteca desde Datos.</div>'; return; }
     sb.innerHTML = sbRows.map((r, i) => `
       <section class="sbrow" data-row="${i}">
         <div class="sbhead"><div><b>${escH(r.label)}</b><span class="mono-caps">${escH(r.sub)} · ${r.books.length} libros</span></div>
           <span class="mono-caps sbn">${i + 1} / ${sbRows.length}</span></div>
         <div class="sbstrip"><i class="sbpad"></i>${r.books.map(spineHtml).join('')}<i class="sbpad"></i></div>
-        <div class="sbinfo"><div class="t"></div><div class="a mono-caps"></div></div>
-        <div class="sbnext mono-caps">${i + 1 < sbRows.length ? `↓ ${escH(sbRows[i + 1].label)} · ${escH(sbRows[i + 1].sub)}` : i ? '↑ Fin de la biblioteca' : ''}</div>
+        <div class="sbinfo"><h2 class="t"></h2><hr><div class="a"></div><div class="y mono-caps"></div></div>
+        <div class="sbnext mono-caps">${i + 1 < sbRows.length ? `↓ ${escH(sbRows[i + 1].label)}` : i ? '↑ Fin de la biblioteca' : ''}</div>
       </section>`).join('');
     sb.querySelectorAll('.sbstrip').forEach(strip => {
       let raf = 0;
       strip.addEventListener('scroll', () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => pickCenter(strip)); }, { passive: true });
       pickCenter(strip);
     });
+    if (focus) {
+      const i = sbRows.findIndex(r => r.sid === focus.sid && r.r === focus.r);
+      if (i >= 0) {
+        const sec = sb.querySelector(`[data-row="${i}"]`); sb.scrollTop = sec.offsetTop;
+        const sp = focus.isbn && sec.querySelector(`.sp[data-isbn="${CSS.escape(focus.isbn)}"]`);
+        if (sp) { centerOn(sp, false); pickCenter(sec.querySelector('.sbstrip')); }
+      }
+    }
   }
-
   function pickCenter(strip) {
     const mid = strip.getBoundingClientRect().left + strip.clientWidth / 2;
     let best = null, bd = Infinity;
-    strip.querySelectorAll('.sp').forEach(sp => {
-      const r = sp.getBoundingClientRect(), d = Math.abs(r.left + r.width / 2 - mid);
-      if (d < bd) { bd = d; best = sp; }
-    });
-    if (!best || best.classList.contains('on')) return;
+    strip.querySelectorAll('.sp').forEach(sp => { const r = sp.getBoundingClientRect(), d = Math.abs(r.left + r.width / 2 - mid); if (d < bd) { bd = d; best = sp; } });
+    if (!best) return;
     strip.querySelector('.sp.on')?.classList.remove('on');
     best.classList.add('on');
-    const row = sbRows[+strip.closest('.sbrow').dataset.row], b = row.books.find(x => x.isbn === best.dataset.isbn), sec = strip.closest('.sbrow');
+    const sec = strip.closest('.sbrow'), b = sbRows[+sec.dataset.row].books.find(x => x.isbn === best.dataset.isbn);
     sec.querySelector('.sbinfo .t').textContent = b.title;
-    sec.querySelector('.sbinfo .a').textContent = [b.authors, b.year, b.publisher].filter(Boolean).join(' · ');
+    sec.querySelector('.sbinfo .t').style.fontSize = Math.min(34, titleSize(b.title) * .78) + 'px';
+    sec.querySelector('.sbinfo .a').textContent = b.authors || 'Autor desconocido';
+    sec.querySelector('.sbinfo .y').textContent = [b.year, b.publisher].filter(Boolean).join(' · ');
   }
   const centerOn = (sp, smooth = true) => sp.scrollIntoView({ inline: 'center', block: 'nearest', behavior: smooth ? 'smooth' : 'auto' });
 
+  // --- mover libros entre baldas (mismo formato que la pestaña Biblioteca del PC) ---
+  async function saveLib(lib, focus) {
+    setLibrary(cleanLibrary(lib)); persist();
+    if (typeof loadLibrary === 'function') { try { await loadLibrary(); } catch {} }   // que el plano del PC no pise el cambio
+    await renderShelves(focus);
+  }
+  function placeBook(lib, isbn, sid, r) {
+    const byIsbn = new Map(allBooks().map(b => [b.isbn, b]));
+    lib.shelves.forEach(s => { s.books = s.books.map(row => entries(row).filter(e => e[0] !== isbn)); });
+    if (!sid) return;
+    const s = lib.shelves.find(x => x.id === sid); if (!s) return;
+    while (s.books.length <= r) s.books.push([]);
+    const row = s.books[r], used = row.reduce((m, e) => Math.max(m, e[1] + thick(byIsbn.get(e[0]))), 0);
+    row.push([isbn, used]);
+    const need = Math.ceil((used + thick(byIsbn.get(isbn)) + 12) / 20);
+    const free = lib.shelves.every(o => o === s || !(s.x < o.x + o.w && o.x < s.x + need && s.y - 2 < o.y + o.h && o.y - 2 < s.y + s.h));
+    if (need > s.w && free) s.w = need;
+  }
+  async function moveBook(isbn, sid, r) {
+    await ready;
+    const lib = cleanLibrary(getLibrary());
+    placeBook(lib, isbn, sid, r);
+    await saveLib(lib, { sid, r, isbn });
+    const s = lib.shelves.find(x => x.id === sid);
+    mtoast(s ? `→ ${s.label}${nRowsOf(s) > 1 ? ' · balda ' + (r + 1) : ''}` : '→ Sin clasificar');
+  }
+  async function newShelfWith(isbn, label) {
+    await ready;
+    const lib = cleanLibrary(getLibrary());
+    const x = lib.shelves.length ? Math.min(...lib.shelves.map(s => s.x)) : 2;
+    const y = lib.shelves.length ? Math.max(...lib.shelves.map(s => s.y + s.h)) + 2 : 6;
+    const s = { id: 's' + Date.now().toString(36), label: label.slice(0, 60), x, y, w: 20, h: 6, books: [[]] };
+    lib.shelves.push(s);
+    placeBook(lib, isbn, s.id, 0);
+    await saveLib(lib, { sid: s.id, r: 0, isbn });
+    mtoast(`Nueva balda · ${s.label}`);
+  }
+
+  function dropTargets() {
+    const lib = cleanLibrary(getLibrary()), out = [];
+    for (const s of lib.shelves) for (let r = 0; r < nRowsOf(s); r++)
+      out.push({ sid: s.id, r, name: s.label || 'Sin etiqueta', sub: nRowsOf(s) > 1 ? `balda ${r + 1}` : '', n: (s.books[r] || []).length });
+    return out;
+  }
+
   function buildShelfBrowser() {
-    const view = document.getElementById('libView'), tools = view?.querySelector('.libtools');
-    if (!tools || document.getElementById('sb')) return;
-    tools.insertAdjacentHTML('beforeend', '<button id="sbMode" class="mono-caps flat" title="Cambiar entre baldas y plano de estanterías"></button>');
-    view.insertAdjacentHTML('beforeend', '<div id="sb" class="sb"></div>');
-    const sb = document.getElementById('sb');
+    const view = $id('libView');
+    if (!view || $id('sb')) return;
+    view.insertAdjacentHTML('beforeend', `<div id="sb" class="sb"></div>
+      <div id="sbDrop" class="sbdrop" aria-hidden="true"><div class="mono-caps sbdh">Suelta el libro en una balda</div><div class="sbgrid" id="sbGrid"></div></div>
+      <div id="sbGhost" class="sbghost" hidden></div>
+      <div id="sbNew" class="msheet" hidden><div class="msin"><div class="msh"><b>Nueva balda</b><span class="mono-caps" id="sbNewB"></span></div>
+        <input id="sbNewIn" type="text" maxlength="40" placeholder="Nombre (p. ej. FANTASÍA)">
+        <div class="msb">${ib('sbNewOk', 'check', 'Crear balda')}${ib('sbNewNo', 'x', 'Cancelar')}</div></div></div>`);
+    const sb = $id('sb');
+    let justDragged = false;
     sb.addEventListener('click', e => {
       const sp = e.target.closest('.sp');
-      if (!sp) return;
+      if (!sp || justDragged) return;
       if (!sp.classList.contains('on')) return centerOn(sp);
       const row = sbRows[+sp.closest('.sbrow').dataset.row];
       if (typeof openDetail === 'function') openDetail(sp.dataset.isbn, row.books.map(b => b.isbn));
     });
+    sb.addEventListener('contextmenu', e => e.preventDefault());
+
+    // --- mantener pulsado + arrastrar ---
+    let lp = null, drag = null;
+    const ghost = $id('sbGhost'), grid = $id('sbGrid');
+    sb.addEventListener('pointerdown', e => {
+      const sp = e.target.closest('.sp.on'); if (!sp) return;
+      lp = { sp, x: e.clientX, y: e.clientY, t: setTimeout(() => startDrag(), 420) };
+    });
+    const cancelLp = () => { if (lp) clearTimeout(lp.t); lp = null; };
+    function startDrag() {
+      const sp = lp.sp, r = sp.getBoundingClientRect();
+      drag = { isbn: sp.dataset.isbn, x: lp.x, y: lp.y, over: null }; lp = null;
+      navigator.vibrate?.(18);
+      grid.innerHTML = dropTargets().map(t => `<div class="sbt" data-sid="${escH(t.sid)}" data-r="${t.r}"><b>${escH(t.name)}</b><span class="mono-caps">${escH(t.sub)}${t.sub ? ' · ' : ''}${t.n}</span></div>`).join('')
+        + '<div class="sbt" data-sid="" data-r="0"><b>Sin clasificar</b><span class="mono-caps">montón</span></div>'
+        + `<div class="sbt plus" data-new="1">${svg('plus')}</div>`;
+      Object.assign(ghost.style, { width: r.width + 'px', height: r.height + 'px' });
+      ghost.hidden = false; moveGhost(drag.x, drag.y);
+      view.classList.add('sbdrag'); sp.classList.add('lifted');
+    }
+    function moveGhost(x, y) {
+      ghost.style.transform = `translate(${x - ghost.offsetWidth / 2}px, ${y - ghost.offsetHeight / 2}px) rotate(-6deg)`;
+      const t = document.elementFromPoint(x, y)?.closest('.sbt');
+      if (t !== drag.over) { drag.over?.classList.remove('hov'); t?.classList.add('hov'); drag.over = t; }
+      const gr = grid.getBoundingClientRect();   // auto-scroll si hay muchas baldas
+      if (y > gr.bottom - 30) grid.scrollTop += 10; else if (y < gr.top + 20 && y > gr.top - 40) grid.scrollTop -= 10;
+    }
+    function endDrag(commit) {
+      const d = drag; drag = null; ghost.hidden = true;
+      view.classList.remove('sbdrag'); sb.querySelector('.sp.lifted')?.classList.remove('lifted');
+      justDragged = true; setTimeout(() => { justDragged = false; }, 350);
+      if (!commit || !d?.over) return;
+      const t = d.over; t.classList.remove('hov');
+      if (t.dataset.new) return askNewShelf(d.isbn);
+      moveBook(d.isbn, t.dataset.sid || null, +t.dataset.r || 0);
+    }
+    document.addEventListener('pointermove', e => {
+      if (lp && Math.hypot(e.clientX - lp.x, e.clientY - lp.y) > 8) cancelLp();
+      if (drag) { drag.x = e.clientX; drag.y = e.clientY; moveGhost(e.clientX, e.clientY); }
+    });
+    document.addEventListener('pointerup', () => { cancelLp(); if (drag) endDrag(true); });
+    document.addEventListener('pointercancel', () => { cancelLp(); if (drag) endDrag(false); });
+    // mientras se arrastra, el dedo no debe desplazar las baldas
+    document.addEventListener('touchmove', e => { if (drag) e.preventDefault(); }, { passive: false });
+
+    let newIsbn = null;
+    function askNewShelf(isbn) {
+      newIsbn = isbn; const b = allBooks().find(x => x.isbn === isbn);
+      $id('sbNewB').textContent = b ? b.title : ''; $id('sbNewIn').value = '';
+      $id('sbNew').hidden = false; setTimeout(() => $id('sbNewIn').focus(), 50);
+    }
+    const closeNew = () => { $id('sbNew').hidden = true; newIsbn = null; };
+    $id('sbNewNo').onclick = closeNew;
+    $id('sbNew').addEventListener('click', e => { if (e.target.id === 'sbNew') closeNew(); });
+    const okNew = () => { const v = $id('sbNewIn').value.trim(); if (!v) return $id('sbNewIn').focus(); const i = newIsbn; closeNew(); newShelfWith(i, v); };
+    $id('sbNewOk').onclick = okNew;
+    $id('sbNewIn').addEventListener('keydown', e => { if (e.key === 'Enter') okNew(); if (e.key === 'Escape') closeNew(); });
+
     // buscar: salta a la balda del primer libro que coincide y lo centra
-    const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-    document.getElementById('lq')?.addEventListener('input', e => {
-      const q = norm(e.target.value).trim();
-      if (sbMode !== 'baldas' || q.length < 2) return;
+    $id('lq')?.addEventListener('input', e => {
+      const q = normS(e.target.value).trim();
+      if (!narrow.matches || q.length < 2) return;
       for (let i = 0; i < sbRows.length; i++) {
-        const b = sbRows[i].books.find(b => norm([b.title, b.authors, b.isbn, b.publisher].join(' ')).includes(q));
+        const b = sbRows[i].books.find(b => normS([b.title, b.authors, b.isbn, b.publisher].join(' ')).includes(q));
         if (!b) continue;
         const sec = sb.querySelector(`[data-row="${i}"]`);
         sb.scrollTo({ top: sec.offsetTop, behavior: 'smooth' });
@@ -492,23 +820,37 @@
         return;
       }
     });
-    document.getElementById('sbMode').onclick = () => {
-      sbMode = sbMode === 'baldas' ? 'plano' : 'baldas';
-      try { localStorage.setItem('libMode', sbMode); } catch {}
-      applyMode();
-      if (sbMode === 'plano') requestAnimationFrame(() => { fitLibrary(); dispatchEvent(new Event('resize')); });
-    };
-    narrow.addEventListener('change', applyMode);
-    applyMode();
+    const apply = () => { view.classList.toggle('sbmode', narrow.matches); if (narrow.matches) renderShelves(); };
+    narrow.addEventListener('change', apply);
+    apply();
   }
-  function applyMode() {
-    const on = narrow.matches && sbMode === 'baldas';
-    document.getElementById('libView')?.classList.toggle('sbmode', on);
-    const btn = document.getElementById('sbMode');
-    if (btn) { btn.textContent = sbMode === 'baldas' ? 'Ver plano' : 'Ver baldas'; btn.style.display = narrow.matches ? '' : 'none'; }
-    if (on) renderShelves();
-  }
-  document.addEventListener('click', e => { if (e.target.closest?.('#tabLib')) requestAnimationFrame(() => { if (narrow.matches && sbMode === 'baldas') renderShelves(); }); }, true);
+  document.addEventListener('click', e => {
+    if (!narrow.matches) return;
+    if (e.target.closest?.('#tabLib')) requestAnimationFrame(() => renderShelves());
+    if (e.target.closest?.('#tabCat')) requestAnimationFrame(() => mcRender());
+  }, true);
 
-  document.addEventListener('DOMContentLoaded', () => { buildPanel(); buildShelfBrowser(); });
+  // ============================================================ aviso de nueva versión
+  // al abrir la app mira la última Release de GitHub; si es más nueva, ofrece descargar la APK (Android la instala encima,
+  // sin perder la biblioteca, porque va firmada con la misma clave)
+  const REPO = 'KMN43/biblioscan';
+  const vparts = v => String(v || '').replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
+  const newer = (a, b) => { const x = vparts(a), y = vparts(b); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
+  async function checkUpdate() {
+    const mine = window.BIBLIO_VERSION;
+    if (!NATIVE || !mine) return;
+    try {
+      const [, body] = await httpGet(`https://api.github.com/repos/${REPO}/releases/latest`);
+      const rel = JSON.parse(body), latest = rel.tag_name, apk = (rel.assets || []).find(a => /\.apk$/i.test(a.name));
+      if (!apk || !newer(latest, mine) || lsGet('skipVersion', '') === latest) return;
+      document.body.insertAdjacentHTML('beforeend', `
+        <div id="upd" class="upd"><div><b>Nueva versión ${escH(latest.replace(/^v/i, ''))}</b><span class="mono-caps">Tienes la ${escH(mine)}</span></div>
+          <a class="ibtn primary" id="updGo" href="${escH(apk.browser_download_url)}" aria-label="Descargar e instalar" title="Descargar e instalar">${svg('download')}</a>
+          ${ib('updNo', 'x', 'Ahora no')}</div>`);
+      $id('updNo').onclick = () => { lsSet('skipVersion', latest); $id('upd').remove(); };
+      $id('updGo').onclick = () => setTimeout(() => $id('upd')?.remove(), 500);
+    } catch {}   // sin conexión o límite de la API de GitHub: ya avisará la próxima vez
+  }
+
+  document.addEventListener('DOMContentLoaded', () => { iconizeButtons(); buildPanel(); buildMobileCatalog(); buildShelfBrowser(); setTimeout(checkUpdate, 2500); });
 })();

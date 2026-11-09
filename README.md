@@ -164,8 +164,15 @@ La misma app, adaptada a la pantalla del móvil. **Todo se guarda en el propio t
 
 **Diferencias con la versión del PC**
 
-- **Pestañas abajo** y escáner con la **cámara trasera**.
-- **Biblioteca en modo baldas**: desliza **arriba o abajo** para cambiar de balda y **a los lados** para recorrer los libros. El libro central se agranda y muestra su título en el lomo; **tócalo para abrir su ficha**. El buscador salta directamente al libro. Con **Ver plano** vuelves al plano de estanterías del PC (encogido para que quepa).
+- **Pestañas abajo**, escáner con la **cámara trasera** y botones solo con iconos.
+- **Catálogo**: dos vistas, que se alternan con el icono de la cabecera.
+  - **Portadas**: un feed vertical (desliza arriba o abajo) con el título en grande, el autor o autora, el año y la editorial. Cada libro tiene un fondo de degradado suave y un icono para ver su portada.
+  - **Lista**: solo texto. Las acciones (ver ficha, editar, borrar) están tras el botón **⋯**, para no tocarlas sin querer.
+  - El **buscador y los filtros** (editorial, idioma, orden) se despliegan con el icono de filtro. El orden por defecto es **Recomendados**, que cambia cada día.
+  - El icono de **estadísticas** despliega los KPIs y la **línea de tiempo**. Toca un año para filtrar por él.
+- **Biblioteca en modo baldas**: desliza **arriba o abajo** para cambiar de balda y **a los lados** para recorrer los lomos. El del centro se resalta y sus datos aparecen debajo; **tócalo para abrir su ficha**.
+  - **Mantén pulsado** el libro central: los detalles bajan y aparecen tus baldas como recuadros. **Arrástralo** a una de ellas, a «Sin clasificar» o al recuadro **+** para crear una balda nueva.
+  - El buscador salta directamente al libro.
 - **Pestaña Datos** (icono de base de datos):
   - **Importar** tu `biblioteca.db` del PC (o un `.json`), añadiéndolo a lo que ya tienes o reemplazándolo.
   - **Exportar** a `.db`, CSV o JSON con el menú *Compartir* de Android (Drive, correo, WhatsApp…).
@@ -182,6 +189,15 @@ npm run apk
 ```
 
 `npm run apk` genera `mobile/android/app/build/outputs/apk/release/app-release.apk`. Para firmarla hacen falta `mobile/keystore.properties` y el archivo `.jks`, que **no están en el repositorio**. Sin ellos, `cd android && gradlew assembleDebug` genera una versión de pruebas. La capa que sustituye al servidor Python está en `mobile/src/native.js` y los estilos de móvil en `mobile/src/mobile.css`.
+
+**Publicar una versión nueva** (la app avisa sola a quien la tenga instalada):
+
+```bash
+cd mobile
+npm run release -- minor --notes "Qué cambia en esta versión"
+```
+
+El comando sube el número de versión (`patch`, `minor`, `major` o uno exacto, como `1.2.0`), compila la APK firmada, hace commit y etiqueta `vX.Y.Z`, y crea la Release en GitHub con la APK y el `.exe`. Necesita el árbol de git sin cambios pendientes. Al abrir la app, quien tenga una versión anterior ve el aviso *Nueva versión*: toca descargar y Android la instala encima, **conservando su biblioteca**.
 
 ---
 
