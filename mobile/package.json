@@ -1,6 +1,6 @@
 {
   "name": "biblioscan-mobile",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "private": true,
   "description": "BiblioScan para Android (Capacitor): la misma interfaz con base de datos SQLite local en el móvil.",
   "scripts": {
