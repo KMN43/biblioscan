@@ -174,7 +174,8 @@ La misma app, adaptada a la pantalla del móvil. **Todo se guarda en el propio t
   - El **buscador y los filtros** (editorial, idioma, orden) se despliegan con el icono de filtro. El orden por defecto es **Recomendados**, que cambia cada día.
   - El icono de **estadísticas** despliega los KPIs y la **línea de tiempo**. Toca un año para filtrar por él.
 - **Biblioteca en modo baldas**: desliza **arriba o abajo** para cambiar de balda y **a los lados** para recorrer los lomos. El del centro se resalta y sus datos aparecen debajo; **tócalo para abrir su ficha**.
-  - **Mantén pulsado** el libro central: los detalles bajan y aparecen tus baldas como recuadros. **Arrástralo** a una de ellas, a «Sin clasificar» o al recuadro **+** para crear una balda nueva.
+  - **Mantén pulsado** el libro central: los detalles bajan y aparecen tus baldas como recuadros. Puedes **arrastrarlo** a una de ellas, o levantar el dedo: el menú se queda abierto para **tocar** la balda (o «Sin clasificar», o **+** para crear una nueva) y desplazarte por ellas.
+  - El botón de la bandeja, junto al buscador, lleva directo a los libros **sin clasificar** y muestra cuántos quedan.
   - El buscador salta directamente al libro.
 - **Pestaña Datos** (icono de base de datos):
   - **Importar** tu `biblioteca.db` del PC (o un `.json`), añadiéndolo a lo que ya tienes o reemplazándolo.

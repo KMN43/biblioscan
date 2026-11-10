@@ -355,6 +355,7 @@
     heartOn: '<path d="M12 19.5s-7-4.3-7-9.6A3.9 3.9 0 0 1 12 7.6a3.9 3.9 0 0 1 7 2.3c0 5.3-7 9.6-7 9.6z" fill="currentColor"/>',
     books: '<path d="M3.5 20h17"/><rect x="5" y="7" width="3" height="13"/><rect x="9.5" y="4.5" width="3" height="15.5"/><path d="M14.6 8.2l2.9-.8 3.3 12.2-2.9.8z"/>',
     sliders: '<path d="M5 7h9M18 7h1M5 17h3M12 17h7"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>',
+    inbox: '<path d="M4 13.5l2.2-8h11.6l2.2 8V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M4 13.5h4.5l1 2.5h5l1-2.5H20"/>',
     home: '<path d="M4 11.2L12 4.5l8 6.7V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/>',
     info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><circle cx="12" cy="7.9" r=".6" fill="currentColor"/>',
     ext: '<path d="M14 4.5h5.5V10M19.5 4.5L11 13M17 14v5.5H4.5V7H10"/>',
@@ -751,6 +752,8 @@
       if (sec) focus = { sid: sbRows[+sec.dataset.row]?.sid, r: sbRows[+sec.dataset.row]?.r, isbn: sec.querySelector('.sp.on')?.dataset.isbn };
     }
     sbRows = await shelfRows();
+    const unc = sbRows.find(r => r.sid === null && sbRows.length > 1);
+    if ($id('sbUncN')) { $id('sbUncN').textContent = unc ? unc.books.length : ''; $id('sbUnc').classList.toggle('dim', !unc); }
     if (!sbRows.length) { sb.innerHTML = '<div class="sbempty mono-caps">Aún no hay libros. Escanea alguno o importa tu biblioteca desde Datos.</div>'; return; }
     sb.innerHTML = sbRows.map((r, i) => `
       <section class="sbrow" data-row="${i}">
@@ -784,7 +787,6 @@
     best.classList.add('on');
     const sec = strip.closest('.sbrow'), b = sbRows[+sec.dataset.row].books.find(x => x.isbn === best.dataset.isbn);
     sec.querySelector('.sbinfo .t').textContent = b.title;
-    sec.querySelector('.sbinfo .t').style.fontSize = Math.min(34, titleSize(b.title) * .78) + 'px';
     sec.querySelector('.sbinfo .a').textContent = b.authors || 'Autor desconocido';
     sec.querySelector('.sbinfo .y').textContent = [b.year, b.publisher].filter(Boolean).join(' · ');
   }
@@ -839,14 +841,15 @@
     const view = $id('libView');
     if (!view || $id('sb')) return;
     view.insertAdjacentHTML('beforeend', `<div id="sb" class="sb"></div>
-      <div id="sbDrop" class="sbdrop" aria-hidden="true"><div class="mono-caps sbdh">Suelta el libro en una balda</div><div class="sbgrid" id="sbGrid"></div></div>
+      <div id="sbDrop" class="sbdrop" aria-hidden="true"><div class="sbdh"><span class="mono-caps">Toca una balda o arrastra el libro</span>${ib('sbDropX', 'x', 'Cancelar')}</div><div class="sbgrid" id="sbGrid"></div></div>
       <div id="sbGhost" class="sbghost" hidden></div>
       <div id="sbNew" class="msheet" hidden><div class="msin"><div class="msh"><b>Nueva balda</b><span class="mono-caps" id="sbNewB"></span></div>
         <input id="sbNewIn" type="text" maxlength="40" placeholder="Nombre (p. ej. FANTASÍA)">
         <div class="msb">${ib('sbNewOk', 'check', 'Crear balda')}${ib('sbNewNo', 'x', 'Cancelar')}</div></div></div>`);
     const sb = $id('sb');
-    let justDragged = false;
+    let justDragged = false, pick = null;   // pick = menú de baldas abierto con el dedo ya levantado
     sb.addEventListener('click', e => {
+      if (pick) { closeMenu(); return; }      // tocar fuera del menú lo cierra
       const sp = e.target.closest('.sp');
       if (!sp || justDragged) return;
       if (!sp.classList.contains('on')) return centerOn(sp);
@@ -881,21 +884,30 @@
       const gr = grid.getBoundingClientRect();   // auto-scroll si hay muchas baldas
       if (y > gr.bottom - 30) grid.scrollTop += 10; else if (y < gr.top + 20 && y > gr.top - 40) grid.scrollTop -= 10;
     }
-    function endDrag(commit) {
-      const d = drag; drag = null; ghost.hidden = true;
+    function closeMenu() {
+      pick = null; ghost.hidden = true;
       view.classList.remove('sbdrag'); sb.querySelector('.sp.lifted')?.classList.remove('lifted');
-      justDragged = true; setTimeout(() => { justDragged = false; }, 350);
-      if (!commit || !d?.over) return;
-      const t = d.over; t.classList.remove('hov');
-      if (t.dataset.new) return askNewShelf(d.isbn);
-      moveBook(d.isbn, t.dataset.sid || null, +t.dataset.r || 0);
+      grid.querySelector('.hov')?.classList.remove('hov');
     }
+    function act(isbn, t) {
+      closeMenu();
+      if (t.dataset.new) return askNewShelf(isbn);
+      moveBook(isbn, t.dataset.sid || null, +t.dataset.r || 0);
+    }
+    function endDrag() {
+      const d = drag; drag = null; ghost.hidden = true;
+      justDragged = true; setTimeout(() => { justDragged = false; }, 350);
+      if (d?.over) return act(d.isbn, d.over);              // arrastrado y soltado sobre una balda
+      pick = { isbn: d.isbn };                              // soltado fuera: el menú se queda abierto para tocar o desplazar
+    }
+    grid.addEventListener('click', e => { const t = e.target.closest('.sbt'); if (t && pick) act(pick.isbn, t); });
+    $id('sbDropX').onclick = closeMenu;
     document.addEventListener('pointermove', e => {
       if (lp && Math.hypot(e.clientX - lp.x, e.clientY - lp.y) > 8) cancelLp();
       if (drag) { drag.x = e.clientX; drag.y = e.clientY; moveGhost(e.clientX, e.clientY); }
     });
-    document.addEventListener('pointerup', () => { cancelLp(); if (drag) endDrag(true); });
-    document.addEventListener('pointercancel', () => { cancelLp(); if (drag) endDrag(false); });
+    document.addEventListener('pointerup', () => { cancelLp(); if (drag) endDrag(); });
+    document.addEventListener('pointercancel', () => { cancelLp(); if (drag) endDrag(); });
     // mientras se arrastra, el dedo no debe desplazar las baldas
     document.addEventListener('touchmove', e => { if (drag) e.preventDefault(); }, { passive: false });
 
@@ -925,6 +937,13 @@
         return;
       }
     });
+    // acceso directo al montón «Sin clasificar»
+    view.querySelector('.libtools')?.insertAdjacentHTML('beforeend', `<button id="sbUnc" class="ibtn uncl" aria-label="Ir a Sin clasificar" title="Sin clasificar">${svg('inbox')}<b id="sbUncN"></b></button>`);
+    $id('sbUnc').onclick = () => {
+      const i = sbRows.findIndex(r => r.sid === null);
+      if (i < 0) return mtoast('Todos tus libros están en una balda');
+      sb.scrollTo({ top: sb.querySelector(`[data-row="${i}"]`).offsetTop, behavior: 'smooth' });
+    };
     const apply = () => { view.classList.toggle('sbmode', narrow.matches); if (narrow.matches) renderShelves(); };
     narrow.addEventListener('change', apply);
     apply();
