@@ -77,6 +77,14 @@
   button.icb::before { content: ''; width: 22px; height: 22px; background: currentColor; -webkit-mask: var(--ic) center / contain no-repeat; mask: var(--ic) center / contain no-repeat; }
   button.icb.on::before { -webkit-mask-image: var(--ic-on, var(--ic)); mask-image: var(--ic-on, var(--ic)); }
 
+  /* ---- Home ---- */
+  .homev { flex: 1; min-height: 0; background: var(--orange); display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+  .homev[hidden] { display: none; }
+  .hmid { text-align: center; }
+  .hmid b { display: block; font: 500 120px/.9 'Space Grotesk', sans-serif; letter-spacing: -.06em; }
+  .hmid span { display: block; margin-top: 10px; }
+  .hname { position: absolute; left: 0; right: 0; bottom: 18px; text-align: center; font: 700 15px 'Chakra Petch', sans-serif; letter-spacing: .02em; }
+
   /* barra lateral → barra de pestañas inferior */
   .side {
     order: 2; flex: none; flex-direction: row; justify-content: center; padding: 6px 10px calc(6px + env(safe-area-inset-bottom));
@@ -84,7 +92,10 @@
   .side-top { flex-direction: row; gap: 10px; }
   .logo, .side-title, .arrow { display: none; }
   .tabs { flex-direction: row; gap: 14px; }
+  .tabs { align-items: center; }
   .tabs button { width: 50px; height: 50px; }
+  .tabs button.home { width: 60px; height: 60px; }
+  .tabs button.home .ic, .tabs button.home svg { width: 28px; height: 28px; }
 
   .sheet, .catv, .libv { flex: 1; min-height: 0; }
   .bar { height: 34px; padding: 0 12px; }

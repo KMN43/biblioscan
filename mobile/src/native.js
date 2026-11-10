@@ -329,6 +329,7 @@
     grid: '<rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M4 10h16M4 15h16M10 4v16"/>',
     braces: '<path d="M9 4.5c-2 0-3 1-3 3v2c0 1.3-.8 2.2-2 2.5 1.2.3 2 1.2 2 2.5v2c0 2 1 3 3 3M15 4.5c2 0 3 1 3 3v2c0 1.3.8 2.2 2 2.5-1.2.3-2 1.2-2 2.5v2c0 2-1 3-3 3"/>',
     swap: '<path d="M4 8h14l-3.5-3.5M20 16H6l3.5 3.5"/>',
+    home: '<path d="M4 11.2L12 4.5l8 6.7V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/>',
     info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><circle cx="12" cy="7.9" r=".6" fill="currentColor"/>',
     ext: '<path d="M14 4.5h5.5V10M19.5 4.5L11 13M17 14v5.5H4.5V7H10"/>',
   };
@@ -432,14 +433,32 @@
 
   // ------------------------------------------------------------ ajustes de móvil
   // cámara trasera por defecto (index.html no indica cuál usar)
+  // en el móvil la cámara solo se enciende en la pestaña Scan: las peticiones hechas fuera de ella esperan
+  const isPhone = () => matchMedia('(max-width: 760px)').matches;
+  let homeOn = true;                        // la app arranca en Home (en pantalla grande no hay Home: se desactiva al cargar)
+  let camWaiters = [];
+  const scanVisible = () => !isPhone() || (!homeOn && !document.hidden && !document.getElementById('scanView')?.classList.contains('hidden'));
   const md = navigator.mediaDevices;
   if (md?.getUserMedia) {
     const gum = md.getUserMedia.bind(md);
     md.getUserMedia = c => {
       if (c?.video && typeof c.video === 'object' && !c.video.deviceId) c = { ...c, video: { ...c.video, facingMode: { ideal: 'environment' } } };
+      if (c?.video && !scanVisible()) return new Promise((res, rej) => camWaiters.push(() => gum(c).then(res, rej)));
       return gum(c);
     };
   }
+  function cameraFor(on) {
+    if (!isPhone()) return;
+    if (on) {
+      const w = camWaiters; camWaiters = [];
+      if (w.length) w.forEach(f => f());
+      else if (typeof startCam === 'function' && !(typeof stream !== 'undefined' && stream?.active))
+        startCam(lsGet('cam', '') || undefined).then(() => typeof listCams === 'function' && listCams()).catch(() => {});
+    } else {
+      try { if (typeof stream !== 'undefined' && stream) { stream.getTracks().forEach(t => t.stop()); stream = null; } } catch {}
+    }
+  }
+  document.addEventListener('visibilitychange', () => { if (!isPhone()) return; if (document.hidden) cameraFor(false); else if (scanVisible()) cameraFor(true); });
 
   const narrow = matchMedia('(max-width: 760px)');
   const $id = id => document.getElementById(id);
@@ -942,5 +961,40 @@
     } catch {}   // sin conexión o límite de la API de GitHub: ya avisará la próxima vez
   }
 
-  document.addEventListener('DOMContentLoaded', () => { iconizeButtons(); buildPanel(); buildMobileCatalog(); buildShelfBrowser(); setTimeout(checkUpdate, 2500); });
+  // ============================================================ navegación: 5 pestañas, Home en el centro
+  // Biblioteca · Info · Home · Scan · Catálogo
+  function showHome() {
+    homeOn = true;
+    ['scanView', 'catView', 'libView'].forEach(v => $id(v)?.classList.add('hidden'));
+    ['tabScan', 'tabCat', 'tabLib'].forEach(t => $id(t)?.classList.remove('active'));
+    $id('homeView').hidden = false; $id('tabHome').classList.add('active');
+    history.replaceState(null, '', location.pathname);
+    cameraFor(false); renderHome();
+  }
+  function renderHome() {
+    const n = books().length, sh = (() => { try { return cleanLibrary(getLibrary()).shelves.length; } catch { return 0; } })();
+    $id('homeN').textContent = n.toLocaleString('es-ES');
+    $id('homeSub').textContent = `${n === 1 ? 'libro' : 'libros'}${sh ? ` · ${sh} ${sh === 1 ? 'estantería' : 'estanterías'}` : ''}`;
+  }
+  function buildNav() {
+    const nav = document.querySelector('.tabs');
+    if (!nav || $id('tabHome')) return;
+    if (!isPhone()) { homeOn = false; cameraFor(true); return; }   // PC / tablet: como siempre, sin Home
+    nav.insertAdjacentHTML('beforeend', `<button id="tabHome" class="home" aria-label="Inicio" title="Inicio">${svg('home')}</button>`);
+    ['tabLib', 'tabData', 'tabHome', 'tabScan', 'tabCat'].forEach(id => $id(id) && nav.append($id(id)));
+    $id('libView').insertAdjacentHTML('afterend', `
+      <div id="homeView" class="homev" hidden>
+        <div class="hmid"><b id="homeN">0</b><span id="homeSub" class="mono-caps"></span></div>
+        <div class="hname">BiblioScan</div>
+      </div>`);
+    $id('tabHome').onclick = showHome;
+    ['tabScan', 'tabCat', 'tabLib'].forEach(id => $id(id).addEventListener('click', () => {   // después del setTab de index.html
+      homeOn = false; $id('homeView').hidden = true; $id('tabHome').classList.remove('active');
+      cameraFor(id === 'tabScan');
+    }));
+    new MutationObserver(() => { if (homeOn) renderHome(); }).observe($id('catCount'), { childList: true, characterData: true, subtree: true });
+    showHome();
+  }
+
+  document.addEventListener('DOMContentLoaded', () => { iconizeButtons(); buildPanel(); buildMobileCatalog(); buildShelfBrowser(); buildNav(); setTimeout(checkUpdate, 2500); });
 })();
