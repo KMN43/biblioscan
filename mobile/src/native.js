@@ -948,9 +948,16 @@
   // descarga la APK dentro de la app y abre el instalador de Android (un toque: «Actualizar»)
   const Installer = NATIVE ? CAP.registerPlugin('ApkInstaller') : null;
   let installing = false;
-  const waitVisible = () => new Promise(res => {
-    const f = () => { if (!document.hidden) { document.removeEventListener('visibilitychange', f); res(); } };
-    document.addEventListener('visibilitychange', f);
+  // tras abrir Ajustes no llega ningún aviso de «has vuelto» a la web: se comprueba el permiso cada segundo (máx. 3 min)
+  const waitPermission = () => new Promise(res => {
+    const t0 = Date.now();
+    const tick = async () => {
+      let ok = false;
+      try { ok = (await Installer.canInstall()).allowed; } catch {}
+      if (ok || Date.now() - t0 > 180000) return res(ok);
+      setTimeout(tick, 1000);
+    };
+    setTimeout(tick, 1000);
   });
   async function installUpdate(url, ui) {
     if (!Installer) { location.href = url; return; }          // navegador: descarga normal
@@ -960,8 +967,8 @@
       if (!(await Installer.canInstall()).allowed) {           // solo la primera vez
         ui.msg('Activa «Permitir de esta fuente» y vuelve');
         await Installer.openInstallSettings();
-        await waitVisible();
-        if (!(await Installer.canInstall()).allowed) { ui.msg('Sin permiso para instalar · vuelve a intentarlo'); return; }
+        if (!(await waitPermission())) { ui.msg('Sin permiso para instalar · vuelve a intentarlo'); return; }
+        ui.msg('Permiso concedido · descargando…');
       }
       ui.progress(0);
       const h = await Installer.addListener('progress', p => ui.progress(p.percent));
