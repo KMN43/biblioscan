@@ -24,7 +24,10 @@
     CREATE TABLE IF NOT EXISTS books (
       isbn TEXT PRIMARY KEY, title TEXT NOT NULL, subtitle TEXT, authors TEXT, publisher TEXT, year TEXT, pages TEXT,
       language TEXT, cover_url TEXT, source TEXT, notes TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);`;
+    CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS wishlist (
+      isbn TEXT PRIMARY KEY, title TEXT NOT NULL, subtitle TEXT, authors TEXT, publisher TEXT, year TEXT, pages TEXT,
+      language TEXT, cover_url TEXT, source TEXT, notes TEXT, created_at TEXT NOT NULL);`;
   const DB_KEY = 'biblioteca.db';
 
   const idb = new Promise((res, rej) => {
@@ -79,6 +82,19 @@
             updated_at=excluded.updated_at`, [...FIELDS.map(f => row[f]), created, updated]);
     return row;
   }
+
+  // --- wishlist: libros consultados que quieres tener (tabla aparte; BiblioScan.exe la ignora) ---
+  const wlAll = () => { try { return rows('SELECT * FROM wishlist ORDER BY created_at DESC'); } catch { return []; } };
+  const wlGet = isbn => { try { return rows('SELECT * FROM wishlist WHERE isbn = ?', [cleanIsbn(isbn)])[0] || null; } catch { return null; } };
+  function wlPut(b, keepDate = false) {
+    const row = {}; FIELDS.forEach(f => { row[f] = String(b[f] ?? '').trim(); });
+    row.isbn = cleanIsbn(b.isbn); if (!row.title) row.title = 'ISBN ' + row.isbn;
+    db.run(`INSERT INTO wishlist (${FIELDS.join(', ')}, created_at) VALUES (${FIELDS.map(() => '?').join(', ')}, ?)
+            ON CONFLICT(isbn) DO UPDATE SET ${FIELDS.filter(f => f !== 'isbn').map(f => `${f}=excluded.${f}`).join(', ')}`,
+      [...FIELDS.map(f => row[f]), keepDate && b.created_at ? String(b.created_at) : nowIso()]);
+    persist();
+  }
+  const wlDel = isbn => { db.run('DELETE FROM wishlist WHERE isbn = ?', [cleanIsbn(isbn)]); persist(); };
 
   function getLibrary() {
     const r = rows("SELECT value FROM kv WHERE key = 'library'")[0];
@@ -195,6 +211,7 @@
       if (![10, 13].includes(isbn.length)) return json({ error: 'ISBN no válido' }, 400);
       if (!String(data.title ?? '').trim()) return json({ error: 'El título es obligatorio' }, 400);
       const row = upsertBook(data); persist();
+      if (wlGet(isbn)) { wlDel(isbn); setTimeout(() => window.BIBLIO_MOBILE.toast?.('♡ De tu wishlist a tu biblioteca'), 300); }
       return json({ ok: true, book: row });
     }
     if (path.startsWith('/api/books/') && method === 'DELETE') {
@@ -252,7 +269,7 @@
     await ready;
     try {
       if (kind === 'csv') await saveFile(`biblioteca-${stamp()}.csv`, 'text/csv', toCsv());
-      if (kind === 'json') await saveFile(`biblioteca-${stamp()}.json`, 'application/json', JSON.stringify(allBooks(), null, 2));
+      if (kind === 'json') await saveFile(`biblioteca-${stamp()}.json`, 'application/json', JSON.stringify({ books: allBooks(), library: getLibrary(), wishlist: wlAll() }, null, 2));
       if (kind === 'db') { await flush(); await saveFile(`biblioteca-${stamp()}.db`, 'application/x-sqlite3', db.export()); }
     } catch (e) {
       if (!/cancel/i.test(String(e?.message || e))) alert('No se pudo exportar: ' + (e?.message || e));
@@ -276,14 +293,15 @@
         const q = sql => { try { const st = src.prepare(sql), out = []; while (st.step()) out.push(st.getAsObject()); st.free(); return out; } catch { return []; } };
         const books = q('SELECT * FROM books');
         const kv = q("SELECT value FROM kv WHERE key = 'library'")[0];
-        if (!books.length && !kv) throw new Error('El archivo no parece una base de datos de BiblioScan.');
-        return { books, library: kv ? JSON.parse(kv.value) : null };
+        const wishlist = q('SELECT * FROM wishlist');
+        if (!books.length && !kv && !wishlist.length) throw new Error('El archivo no parece una base de datos de BiblioScan.');
+        return { books, library: kv ? JSON.parse(kv.value) : null, wishlist };
       } finally { src.close(); }
     }
     let data;
     try { data = JSON.parse(new TextDecoder().decode(bytes)); } catch { throw new Error('Formato no reconocido. Usa un .db o un .json exportado de BiblioScan.'); }
     if (Array.isArray(data)) return { books: data, library: null };
-    if (Array.isArray(data?.books)) return { books: data.books, library: data.library || null };
+    if (Array.isArray(data?.books)) return { books: data.books, library: data.library || null, wishlist: Array.isArray(data.wishlist) ? data.wishlist : [] };
     throw new Error('El JSON no contiene una lista de libros.');
   }
   async function applyImport(imp, replace) {
@@ -298,6 +316,9 @@
         upsertBook(b, true); n++;
       }
       if (imp.library && (replace || !getLibrary().shelves.length)) setLibrary(cleanLibrary(imp.library));
+      if (replace && imp.wishlist) db.run('DELETE FROM wishlist');
+      const owned = new Set(rows('SELECT isbn FROM books').map(r => r.isbn));
+      for (const w of imp.wishlist || []) if ([10, 13].includes(cleanIsbn(w.isbn).length) && !owned.has(cleanIsbn(w.isbn))) wlPut(w, true);
       db.run('COMMIT');
       await flush();
       return n;
@@ -329,6 +350,10 @@
     grid: '<rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M4 10h16M4 15h16M10 4v16"/>',
     braces: '<path d="M9 4.5c-2 0-3 1-3 3v2c0 1.3-.8 2.2-2 2.5 1.2.3 2 1.2 2 2.5v2c0 2 1 3 3 3M15 4.5c2 0 3 1 3 3v2c0 1.3.8 2.2 2 2.5-1.2.3-2 1.2-2 2.5v2c0 2-1 3-3 3"/>',
     swap: '<path d="M4 8h14l-3.5-3.5M20 16H6l3.5 3.5"/>',
+    search: '<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/>',
+    heart: '<path d="M12 19.5s-7-4.3-7-9.6A3.9 3.9 0 0 1 12 7.6a3.9 3.9 0 0 1 7 2.3c0 5.3-7 9.6-7 9.6z"/>',
+    heartOn: '<path d="M12 19.5s-7-4.3-7-9.6A3.9 3.9 0 0 1 12 7.6a3.9 3.9 0 0 1 7 2.3c0 5.3-7 9.6-7 9.6z" fill="currentColor"/>',
+    books: '<path d="M3.5 20h17"/><rect x="5" y="7" width="3" height="13"/><rect x="9.5" y="4.5" width="3" height="15.5"/><path d="M14.6 8.2l2.9-.8 3.3 12.2-2.9.8z"/>',
     home: '<path d="M4 11.2L12 4.5l8 6.7V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/>',
     info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><circle cx="12" cy="7.9" r=".6" fill="currentColor"/>',
     ext: '<path d="M14 4.5h5.5V10M19.5 4.5L11 13M17 14v5.5H4.5V7H10"/>',
@@ -436,8 +461,9 @@
   // en el móvil la cámara solo se enciende en la pestaña Scan: las peticiones hechas fuera de ella esperan
   const isPhone = () => matchMedia('(max-width: 760px)').matches;
   let homeOn = true;                        // la app arranca en Home (en pantalla grande no hay Home: se desactiva al cargar)
+  let scanMode = null;                      // null = círculos de entrada · 'add' · 'look'
   let camWaiters = [];
-  const scanVisible = () => !isPhone() || (!homeOn && !document.hidden && !document.getElementById('scanView')?.classList.contains('hidden'));
+  const scanVisible = () => !isPhone() || (!homeOn && !!scanMode && !document.hidden && !document.getElementById('scanView')?.classList.contains('hidden'));
   const md = navigator.mediaDevices;
   if (md?.getUserMedia) {
     const gum = md.getUserMedia.bind(md);
@@ -479,12 +505,13 @@
   }
 
   // ============================================================ CATÁLOGO (móvil)
-  const MC = { view: lsGet('mcView', 'feed'), q: '', pub: '', lang: '', sort: 'rec', yr: null };
+  const MC = { view: lsGet('mcView', 'feed'), q: '', pub: '', lang: '', sort: 'rec', yr: null, src: 'lib' };
+  const srcBooks = () => MC.src === 'wish' ? wlAll() : books();
   const SORTS = [['rec', 'Recomendados'], ['recent', 'Añadidos recientes'], ['title', 'Título A–Z'], ['author', 'Autor A–Z'], ['new', 'Año: nuevos'], ['old', 'Año: antiguos']];
 
   function mcBase() {   // todos los filtros menos el del año (el timeline muestra la distribución sin él)
     const terms = normS(MC.q).split(/\s+/).filter(Boolean);
-    return books().filter(b => (!MC.pub || b.publisher === MC.pub) && (!MC.lang || b.language === MC.lang)
+    return srcBooks().filter(b => (!MC.pub || b.publisher === MC.pub) && (!MC.lang || b.language === MC.lang)
       && (!terms.length || terms.every(t => normS([b.title, b.subtitle, b.authors, b.publisher, b.isbn, b.notes, b.year].join(' ')).includes(t))));
   }
   function mcList() {
@@ -520,6 +547,7 @@
           <div class="mcbtns">${ib('mcFilt', 'filter', 'Buscar y filtrar')}${ib('mcStatsB', 'chart', 'Estadísticas y línea de tiempo')}${ib('mcViewB', 'list', 'Cambiar vista')}</div>
         </div>
         <div id="mcFilters" class="mcpanel" hidden>
+          <div class="mcsrc">${ib('mcSrcLib', 'books', 'Mi biblioteca')}${ib('mcSrcWish', 'heart', 'Wishlist')}<span id="mcSrcT" class="mono-caps"></span></div>
           <input id="mcQ" type="text" placeholder="Buscar título, autor, editorial, ISBN…" autocomplete="off">
           <div class="mcsel"><select id="mcPub" aria-label="Editorial"></select><select id="mcLang" aria-label="Idioma"></select>
             <select id="mcSort" aria-label="Orden">${SORTS.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>
@@ -545,12 +573,15 @@
     $id('mcPub').onchange = e => { MC.pub = e.target.value; mcRender(); };
     $id('mcLang').onchange = e => { MC.lang = e.target.value; mcRender(); };
     $id('mcSort').onchange = e => { MC.sort = e.target.value; mcRender(); };
-    $id('mcClear').onclick = () => { Object.assign(MC, { q: '', pub: '', lang: '', sort: 'rec', yr: null }); $id('mcQ').value = ''; mcRender(); };
+    $id('mcClear').onclick = () => { Object.assign(MC, { q: '', pub: '', lang: '', sort: 'rec', yr: null, src: 'lib' }); $id('mcQ').value = ''; mcRender(); };
+    $id('mcSrcLib').onclick = () => { MC.src = 'lib'; MC.pub = MC.lang = ''; MC.yr = null; mcRender(); };
+    $id('mcSrcWish').onclick = () => { MC.src = 'wish'; MC.pub = MC.lang = ''; MC.yr = null; mcRender(); };
     $id('mcBody').addEventListener('click', e => {
       const cov = e.target.closest('.mfcov'), dots = e.target.closest('.mld'), item = e.target.closest('[data-isbn]');
       if (!item) return;
       const isbn = item.dataset.isbn;
       if (cov) return showCover(isbn);
+      if (MC.src === 'wish') return openLook(isbn);              // la wishlist no está en el catálogo: ficha de consulta
       if (dots) return openSheet(isbn);
       if (typeof openDetail === 'function') openDetail(isbn, mcList().map(b => b.isbn));
     });
@@ -580,7 +611,7 @@
   }
 
   function showCover(isbn) {
-    const b = books().find(x => x.isbn === isbn); if (!b) return;
+    const b = srcBooks().find(x => x.isbn === isbn); if (!b) return;
     const c = $id('mcCover');
     c.innerHTML = `<div class="mcovin">${typeof coverHtml === 'function' ? coverHtml(b, true) : `<img src="${escH(b.cover_url)}" alt="">`}</div>`;
     c.querySelectorAll('img').forEach(img => { img.style.filter = 'none'; img.onerror = () => img.remove(); });
@@ -588,7 +619,7 @@
   }
 
   function mcFillSelects() {
-    const base = books(), count = k => base.reduce((m, b) => (b[k] && m.set(b[k], (m.get(b[k]) || 0) + 1), m), new Map());
+    const base = srcBooks(), count = k => base.reduce((m, b) => (b[k] && m.set(b[k], (m.get(b[k]) || 0) + 1), m), new Map());
     const opts = (m, all) => `<option value="">${all}</option>` + [...m].sort((a, b) => a[0].localeCompare(b[0], 'es')).map(([v, n]) => `<option value="${escH(v)}">${escH(v)} (${n})</option>`).join('');
     $id('mcPub').innerHTML = opts(count('publisher'), 'Todas las editoriales'); $id('mcPub').value = MC.pub;
     $id('mcLang').innerHTML = opts(count('language'), 'Todos los idiomas'); $id('mcLang').value = MC.lang;
@@ -598,12 +629,14 @@
   function mcRender() {
     const body = $id('mcBody'); if (!body) return;
     mcFillSelects();
-    const list = mcList(), all = books().length, filtered = list.length !== all;
-    $id('mcCount').textContent = filtered ? `${list.length} de ${all}` : `${all} libros`;
-    $id('mcFilt').classList.toggle('dot', !!(MC.q || MC.pub || MC.lang || MC.yr || MC.sort !== 'rec'));
+    const list = mcList(), all = srcBooks().length, filtered = list.length !== all, wish = MC.src === 'wish';
+    $id('mcCount').textContent = (filtered ? `${list.length} de ${all}` : `${all} ${all === 1 ? 'libro' : 'libros'}`) + (wish ? ' · wishlist' : '');
+    $id('mcFilt').classList.toggle('dot', !!(MC.q || MC.pub || MC.lang || MC.yr || MC.sort !== 'rec' || wish));
+    $id('mcSrcLib').classList.toggle('on', !wish); $id('mcSrcWish').classList.toggle('on', wish);
+    $id('mcSrcT').textContent = wish ? `Wishlist · ${wlAll().length}` : `Mi biblioteca · ${books().length}`;
     $id('mcViewB').innerHTML = svg(MC.view === 'feed' ? 'list' : 'feed');
     body.className = 'mcbody ' + MC.view;
-    if (!list.length) body.innerHTML = `<div class="sbempty mono-caps">${all ? 'Ningún libro coincide con los filtros.' : 'Aún no hay libros. Escanea alguno o importa tu biblioteca desde Datos.'}</div>`;
+    if (!list.length) body.innerHTML = `<div class="sbempty mono-caps">${all ? 'Ningún libro coincide con los filtros.' : wish ? 'Tu wishlist está vacía. En Scan, usa la lupa para consultar un libro y toca ♡.' : 'Aún no hay libros. Escanea alguno o importa tu biblioteca desde Info.'}</div>`;
     else if (MC.view === 'feed') body.innerHTML = list.map((b, i) => `
       <article class="mfc" data-isbn="${escH(b.isbn)}" style="background:${bgFor(b.isbn)}">
         <div class="mfk mono-caps"><span>${i + 1} / ${list.length}</span></div>
@@ -961,6 +994,112 @@
     } catch {}   // sin conexión o límite de la API de GitHub: ya avisará la próxima vez
   }
 
+  // ============================================================ SCAN (móvil): «+» añadir · lupa consultar
+  // la pantalla de entrada no enciende la cámara; solo los dos modos
+  function setScanMode(m) {
+    scanMode = m;
+    const v = $id('scanView'); if (!v) return;
+    v.dataset.mode = m || 'home';
+    const badge = $id('scMode'); if (badge) badge.innerHTML = m ? svg(m === 'look' ? 'search' : 'plus') : '';
+    cameraFor(!!m);
+  }
+  function buildScan() {
+    const v = $id('scanView');
+    if (!v || $id('scanHome')) return;
+    v.insertAdjacentHTML('afterbegin', `
+      <div id="scanHome" class="schome">
+        <button id="scAdd" class="scc big" aria-label="Añadir libros a la biblioteca" title="Añadir libros">${svg('plus')}</button>
+        <button id="scLook" class="scc small" aria-label="Consultar un libro sin añadirlo" title="Consultar">${svg('search')}</button>
+      </div>`);
+    v.querySelector('.viewport')?.insertAdjacentHTML('beforeend', `<div class="scbar">${ib('scBack', 'prev', 'Volver')}<span id="scMode" class="scmode"></span></div>`);
+    $id('scAdd').onclick = () => setScanMode('add');
+    $id('scLook').onclick = () => setScanMode('look');
+    $id('scBack').onclick = () => setScanMode(null);
+    $id('tabScan').addEventListener('click', () => setScanMode(null));   // cada visita empieza en los círculos
+    setScanMode(null);
+  }
+
+  // --- modo consulta: ficha sin guardar, dónde lo tienes y ♡ wishlist ---
+  let lookIsbn = null;
+  function buildLook() {
+    if ($id('lookSheet')) return;
+    document.body.insertAdjacentHTML('beforeend', `
+      <div id="lookSheet" class="msheet" hidden><div class="msin look">
+        <div class="lkrow"><div class="lkcov" id="lkCov"></div>
+          <div class="lkinfo"><div class="mono-caps lkst" id="lkSt"></div><h2 id="lkT"></h2><div class="lka" id="lkA"></div><div class="mono-caps lky" id="lkY"></div></div></div>
+        <div id="lkWhere" class="lkwhere mono-caps" hidden></div>
+        <div class="msb">${ib('lkWish', 'heart', 'Añadir a la wishlist')}${ib('lkAdd', 'plus', 'Añadir a mi biblioteca')}${ib('lkClose', 'x', 'Cerrar')}</div>
+      </div></div>`);
+    const close = () => {
+      $id('lookSheet').hidden = true;
+      try { if (lookIsbn) handled.set(lookIsbn, performance.now()); modalOpen = false; } catch {}
+      lookIsbn = null;
+    };
+    $id('lkClose').onclick = close;
+    $id('lookSheet').addEventListener('click', e => { if (e.target.id === 'lookSheet') close(); });
+    $id('lkWish').onclick = async () => {
+      await ready;
+      const i = lookIsbn, w = wlGet(i);
+      if (w) { wlDel(i); mtoast('Quitado de la wishlist'); }
+      else { wlPut({ ...(lookData || {}), isbn: i }); mtoast('♡ Añadido a tu wishlist'); }
+      paintWish(); if (MC.src === 'wish') mcRender();
+    };
+    $id('lkAdd').onclick = () => { const i = lookIsbn; close(); try { handled.delete(i); } catch {} origConfirm(i); };
+  }
+  let lookData = null;
+  function paintWish() {
+    const on = !!wlGet(lookIsbn), b = $id('lkWish');
+    b.innerHTML = svg(on ? 'heartOn' : 'heart'); b.classList.toggle('primary', on);
+    b.setAttribute('aria-label', on ? 'Quitar de la wishlist' : 'Añadir a la wishlist'); b.title = b.getAttribute('aria-label');
+  }
+  async function openLook(isbn) {
+    await ready;
+    isbn = cleanIsbn(isbn); lookIsbn = isbn; lookData = null;
+    try { modalOpen = true; } catch {}
+    const owned = books().find(b => b.isbn === isbn), wish = wlGet(isbn);
+    const show = (b, status) => {
+      lookData = b;
+      $id('lkSt').textContent = status;
+      $id('lkT').textContent = b?.title || `ISBN ${isbn}`;
+      $id('lkA').textContent = b?.authors || '';
+      $id('lkY').textContent = [b?.year, b?.publisher].filter(Boolean).join(' · ');
+      const cov = b?.cover_url;
+      $id('lkCov').innerHTML = cov ? `<img src="${escH(cov)}" alt="">` : '';
+      $id('lkCov').querySelector('img')?.addEventListener('error', e => e.target.remove());
+    };
+    $id('lkWhere').hidden = !owned;
+    $id('lkWish').hidden = !!owned; $id('lkAdd').hidden = !!owned;
+    if (owned) {
+      const where = (typeof shelfOf === 'function' && shelfOf(isbn)) || 'Sin clasificar · en el montón';
+      $id('lkWhere').innerHTML = `<b>Ya lo tienes</b><span>${escH(where)}</span>`;
+    }
+    paintWish();
+    $id('lookSheet').hidden = false;
+    if (owned || wish) return show(owned || wish, owned ? 'En tu biblioteca' : '♡ En tu wishlist');
+    show(null, 'Buscando…');
+    try {
+      const j = await (await fetch(`/api/lookup?isbn=${isbn}`)).json();
+      if (lookIsbn !== isbn) return;
+      if (j.found) show({ ...j.book, isbn, source: j.sources.join(' + ') }, `Encontrado en ${j.sources.join(' + ')}`);
+      else show(null, 'No encontrado en Google Books, todostuslibros ni Open Library');
+    } catch { if (lookIsbn === isbn) show(null, 'Sin conexión'); }
+  }
+
+  // en modo consulta, lo que index.html abriría como «confirmar y guardar» se abre como ficha de consulta
+  let origConfirm = isbn => openConfirm(isbn);
+  function hookConfirm() {
+    if (typeof window.openConfirm !== 'function' || window.openConfirm.__bs) return;
+    const orig = window.openConfirm;
+    origConfirm = isbn => {
+      const r = orig(isbn);
+      if (wlGet(isbn)) Promise.resolve(r).then(() => { const st = $id('mStatus'); st.textContent = '♡ Está en tu wishlist · al guardarlo pasa a tu biblioteca'; st.className = 'mono-caps warn'; });
+      return r;
+    };
+    const wrapped = isbn => (isPhone() && scanMode === 'look' && !$id('scanView').classList.contains('hidden')) ? openLook(isbn) : origConfirm(isbn);
+    wrapped.__bs = true;
+    window.openConfirm = wrapped;
+  }
+
   // ============================================================ navegación: 5 pestañas, Home en el centro
   // Biblioteca · Info · Home · Scan · Catálogo
   function showHome() {
@@ -990,11 +1129,16 @@
     $id('tabHome').onclick = showHome;
     ['tabScan', 'tabCat', 'tabLib'].forEach(id => $id(id).addEventListener('click', () => {   // después del setTab de index.html
       homeOn = false; $id('homeView').hidden = true; $id('tabHome').classList.remove('active');
-      cameraFor(id === 'tabScan');
+      cameraFor(id === 'tabScan' && !!scanMode);
     }));
     new MutationObserver(() => { if (homeOn) renderHome(); }).observe($id('catCount'), { childList: true, characterData: true, subtree: true });
     showHome();
   }
 
-  document.addEventListener('DOMContentLoaded', () => { iconizeButtons(); buildPanel(); buildMobileCatalog(); buildShelfBrowser(); buildNav(); setTimeout(checkUpdate, 2500); });
+  document.addEventListener('DOMContentLoaded', () => {
+    window.BIBLIO_MOBILE.toast = mtoast;
+    iconizeButtons(); buildPanel(); buildMobileCatalog(); buildShelfBrowser();
+    if (isPhone()) { buildScan(); buildLook(); hookConfirm(); }
+    buildNav(); setTimeout(checkUpdate, 2500);
+  });
 })();

@@ -164,7 +164,9 @@ La misma app, adaptada a la pantalla del móvil. **Todo se guarda en el propio t
 
 **Diferencias con la versión del PC**
 
-- **Pestañas abajo**, escáner con la **cámara trasera** y botones solo con iconos.
+- **Cinco pestañas abajo**: Biblioteca · Info · **Home** · Scan · Catálogo. La app arranca en Home y la cámara solo se enciende al escanear. Los botones son solo iconos.
+- **Scan**: dos círculos sobre fondo naranja. **«+» añade** libros a tu biblioteca y **la lupa consulta** un libro sin guardarlo: te dice si ya lo tienes (y en qué balda) o te deja guardarlo en tu **wishlist ♡**. El visor de la cámara es cuadrado y ocupa todo el ancho.
+- **Wishlist**: si luego añades con «+» un libro de tu wishlist, la app te avisa y lo pasa a tu biblioteca. En el catálogo, el filtro **Biblioteca / Wishlist** cambia entre las dos listas. Se guarda en una tabla aparte del mismo `.db`, así que el archivo sigue funcionando en el PC.
 - **Catálogo**: dos vistas, que se alternan con el icono de la cabecera.
   - **Portadas**: un feed vertical (desliza arriba o abajo) con el título en grande, el autor o autora, el año y la editorial. Cada libro tiene un fondo de degradado suave y un icono para ver su portada.
   - **Lista**: solo texto. Las acciones (ver ficha, editar, borrar) están tras el botón **⋯**, para no tocarlas sin querer.
