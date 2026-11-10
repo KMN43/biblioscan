@@ -291,3 +291,19 @@
   .scmode { width: 44px; height: 44px; border-radius: 50%; background: var(--orange); display: flex; align-items: center; justify-content: center; }
   .scmode:empty { display: none; }
 }
+
+/* ---- configurador del sol (Home) ---- */
+#sunCfgBtn { position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); right: 14px; z-index: 2;
+             border-color: rgba(18,18,18,.55); background: rgba(236,235,230,.18); }
+.sunsheet { background: rgba(18,18,18,.12); }
+.sunsheet .msin { max-height: 62vh; overflow-y: auto; }
+.sthemes { display: flex; gap: 12px; margin: 16px 0 6px; }
+.sth { width: 44px; height: 44px; border-radius: 50%; padding: 0; border: 1px solid var(--ink);
+       background: linear-gradient(135deg, var(--a) 0 55%, var(--b) 55% 100%); }
+.sth:hover { background: linear-gradient(135deg, var(--a) 0 55%, var(--b) 55% 100%); }
+.sth.on { outline: 2px solid var(--ink); outline-offset: 3px; }
+.sctl { display: grid; gap: 12px; margin-top: 12px; }
+.sc { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; }
+.sc span { font: 400 14px 'Space Grotesk', sans-serif; }
+.sc output { color: var(--muted); font-variant-numeric: tabular-nums; }
+.sc input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--orange); margin: 0; }
