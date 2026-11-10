@@ -1107,6 +1107,194 @@
     window.openConfirm = wrapped;
   }
 
+  // ============================================================ HOME · el sol de tu biblioteca
+  // · un punto por página (hasta MAX_POINTS) · semilla fija = nº de libros + nº de páginas (misma biblioteca → mismo sol)
+  // · cada libro es un pozo de gravedad invisible en la esfera; sus páginas giran a su alrededor (granulación)
+  //   y otras fluyen en arcos hacia los libros enlazados (protuberancias, «atmósfera»)
+  // · los enlaces entre libros se reescriben poco a poco con una regla tipo Wolfram: {x,y} → {x,y},{y,z}
+  // · se gira con el dedo, con inercia; solo visual
+  const MAX_POINTS = 16000, MIN_POINTS = 5000;
+  const SUN = { on: false, raf: 0, key: '' };
+
+  function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  const v3 = (x, y, z) => [x, y, z];
+  const norm3 = v => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  function randUnit(rnd) { const z = rnd() * 2 - 1, t = rnd() * Math.PI * 2, r = Math.sqrt(1 - z * z); return [r * Math.cos(t), r * Math.sin(t), z]; }
+  function basis(n) { const a = Math.abs(n[0]) < .9 ? [1, 0, 0] : [0, 1, 0]; const e1 = norm3(cross(n, a)); return [e1, cross(n, e1)]; }
+  function rotAxis(v, k, ang) {   // Rodrigues
+    const c = Math.cos(ang), s = Math.sin(ang), d = dot(k, v), cr = cross(k, v);
+    return [v[0] * c + cr[0] * s + k[0] * d * (1 - c), v[1] * c + cr[1] * s + k[1] * d * (1 - c), v[2] * c + cr[2] * s + k[2] * d * (1 - c)];
+  }
+
+  function buildSun(list) {
+    const pages = list.map(b => Math.max(40, parseInt(b.pages, 10) || 200));
+    const total = pages.reduce((a, b) => a + b, 0);
+    const seed = hash(`${list.length}:${total}`);
+    const rnd = mulberry(seed);
+    const n = Math.max(MIN_POINTS, Math.min(MAX_POINTS, total));
+    // pozos (libros)
+    const wells = list.map((b, i) => ({ u: randUnit(rnd), m: pages[i] / (total || 1), axis: randUnit(rnd), spin: (rnd() - .5) * .12 }));
+    wells.forEach(w => { w.b = basis(w.u); });
+    // enlaces iniciales: cada libro con 1–2 vecinos cercanos (red tipo Wolfram que luego se reescribe)
+    const links = [];
+    const near = i => wells.map((w, j) => [j, dot(w.u, wells[i].u)]).filter(([j]) => j !== i).sort((a, b) => b[1] - a[1]).map(([j]) => j);
+    if (wells.length > 1) wells.forEach((_, i) => { const nb = near(i); links.push({ a: i, b: nb[0], from: nb[0], mix: 1 }); if (rnd() < .5 && nb[1] != null) links.push({ a: i, b: nb[1], from: nb[1], mix: 1 }); });
+    // puntos: Float32Array por propiedad (rápido)
+    const own = new Int32Array(n), kind = new Uint8Array(n), r = new Float32Array(n), ph = new Float32Array(n), w = new Float32Array(n),
+          t = new Float32Array(n), sp = new Float32Array(n), lk = new Int32Array(n), hh = new Float32Array(n), bri = new Float32Array(n);
+    const real = Math.min(n, total), cum = [];
+    let acc = 0; pages.forEach(p => { acc += p; cum.push(acc); });
+    for (let i = 0; i < n; i++) {
+      bri[i] = .55 + rnd() * .45;
+      if (i >= real || !wells.length) { kind[i] = 2; own[i] = -1; ph[i] = rnd(); r[i] = rnd(); w[i] = (rnd() - .5) * .05; bri[i] *= .35; continue; }   // polvo de relleno
+      const target = (i / real) * total; let k = 0; while (cum[k] < target && k < cum.length - 1) k++;
+      own[i] = k;
+      const myLinks = links.filter(l => l.a === k);
+      if (myLinks.length && rnd() < .38) {                 // protuberancia: viaja por un arco hacia un libro enlazado
+        kind[i] = 1; lk[i] = links.indexOf(myLinks[Math.floor(rnd() * myLinks.length)]);
+        t[i] = rnd(); sp[i] = .03 + rnd() * .07; hh[i] = .06 + rnd() * .22 * (.5 + wells[k].m * 8);
+      } else {                                             // granulación alrededor del pozo
+        kind[i] = 0;
+        const spread = .07 + Math.sqrt(wells[k].m) * .75;
+        r[i] = Math.abs((rnd() + rnd() + rnd() - 1.5) / 1.5) * spread;
+        ph[i] = rnd() * Math.PI * 2; w[i] = (.25 + rnd() * .6) / (.15 + r[i] * 3) * (rnd() < .5 ? -1 : 1);
+        hh[i] = rnd() * .025;
+      }
+    }
+    return { n, seed, rnd, wells, links, own, kind, r, ph, w, t, sp, lk, hh, bri, rewireAt: 3 };
+  }
+
+  // regla de reescritura (inspirada en Wolfram Physics): toma un enlace {x,y}, lo conserva y crea {y,z} hacia un libro z;
+  // para no crecer sin fin, el enlace más antiguo de y migra suavemente al nuevo destino
+  function rewire(S) {
+    if (S.links.length < 2 || S.wells.length < 3) return;
+    const L = S.links[Math.floor(S.rnd() * S.links.length)], y = L.b;
+    const cand = S.links.filter(l => l.a === y);
+    const z = Math.floor(S.rnd() * S.wells.length);
+    if (z === y) return;
+    const target = cand.length ? cand[Math.floor(S.rnd() * cand.length)] : S.links.find(l => l.a === y);
+    if (!target || target.b === z) return;
+    target.from = target.b; target.b = z; target.mix = 0;   // transición suave hacia el nuevo vecino
+  }
+
+  function slerp(a, b, t) {
+    const d = Math.max(-1, Math.min(1, dot(a, b))), om = Math.acos(d);
+    if (om < 1e-4) return a;
+    const s = Math.sin(om), k1 = Math.sin((1 - t) * om) / s, k2 = Math.sin(t * om) / s;
+    return [a[0] * k1 + b[0] * k2, a[1] * k1 + b[1] * k2, a[2] * k1 + b[2] * k2];
+  }
+
+  function startSun() {
+    const cv = $id('sunCanvas'); if (!cv) return;
+    const list = books();
+    const key = `${list.length}:${list.reduce((a, b) => a + (parseInt(b.pages, 10) || 0), 0)}`;
+    if (SUN.key !== key || !SUN.S) { SUN.S = buildSun(list); SUN.key = key; }
+    if (SUN.on) return;
+    SUN.on = true;
+    const ctx = cv.getContext('2d'), buf = document.createElement('canvas'), bctx = buf.getContext('2d');
+    let W = 0, H = 0, img = null, px = null, scale = 1, last = performance.now(), slow = 0;
+    // rotación global (matriz 3x3) + velocidad angular con inercia
+    let M = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+    const rot = { vx: 0, vy: .08, base: .08, drag: null };
+    const size = () => {
+      scale = Math.min(devicePixelRatio || 1, 1.5);
+      W = Math.max(1, Math.round(cv.clientWidth * scale)); H = Math.max(1, Math.round(cv.clientHeight * scale));
+      cv.width = buf.width = W; cv.height = buf.height = H;
+      img = bctx.createImageData(W, H); px = new Uint32Array(img.data.buffer);
+    };
+    size();
+    SUN.resize = size;
+    const applyRot = (ax, ay) => {   // gira alrededor de los ejes de pantalla
+      const rx = (a, m) => { const c = Math.cos(a), s = Math.sin(a); return [m[0], m[1], m[2], c * m[3] - s * m[6], c * m[4] - s * m[7], c * m[5] - s * m[8], s * m[3] + c * m[6], s * m[4] + c * m[7], s * m[5] + c * m[8]]; };
+      const ry = (a, m) => { const c = Math.cos(a), s = Math.sin(a); return [c * m[0] + s * m[6], c * m[1] + s * m[7], c * m[2] + s * m[8], m[3], m[4], m[5], -s * m[0] + c * m[6], -s * m[1] + c * m[7], -s * m[2] + c * m[8]]; };
+      M = ry(ay, rx(ax, M));
+    };
+    // interacción
+    cv.onpointerdown = e => { cv.setPointerCapture?.(e.pointerId); rot.drag = { x: e.clientX, y: e.clientY, t: performance.now() }; };
+    cv.onpointermove = e => {
+      const d = rot.drag; if (!d) return;
+      const now = performance.now(), dt = Math.max(8, now - d.t) / 1000, k = 3.2 / Math.min(cv.clientWidth, cv.clientHeight);
+      const dx = (e.clientX - d.x) * k, dy = (e.clientY - d.y) * k;
+      applyRot(dy, dx);
+      rot.vx = rot.vx * .4 + (dy / dt) * .6; rot.vy = rot.vy * .4 + (dx / dt) * .6;
+      d.x = e.clientX; d.y = e.clientY; d.t = now;
+    };
+    cv.onpointerup = cv.onpointercancel = () => { rot.drag = null; };
+
+    const CREAM = [255, 244, 225], INK = [18, 18, 18];
+    const frame = now => {
+      if (!SUN.on) return;
+      const dt = Math.min(.05, (now - last) / 1000); last = now;
+      const S = SUN.S, T = now / 1000;
+      // inercia: la velocidad vuelve suavemente al giro lento de base
+      if (!rot.drag) {
+        const f = 1 - Math.exp(-dt * 1.2);
+        rot.vx += (0 - rot.vx) * f; rot.vy += (rot.base - rot.vy) * f;
+        applyRot(rot.vx * dt, rot.vy * dt);
+      }
+      // los pozos derivan despacio (cada uno alrededor de su eje) y la red se reescribe
+      for (const wl of S.wells) { wl.u = norm3(rotAxis(wl.u, wl.axis, wl.spin * dt)); wl.b = basis(wl.u); }
+      S.rewireAt -= dt; if (S.rewireAt <= 0) { rewire(S); S.rewireAt = 2.5 + S.rnd() * 2.5; }
+      for (const l of S.links) if (l.mix < 1) l.mix = Math.min(1, l.mix + dt / 2.5);
+      // pintar
+      px.fill(0);
+      const R = Math.min(W, H) * .34, cx = W / 2, cy = H / 2, cam = 3.4;
+      const m = M;
+      for (let i = 0; i < S.n; i++) {
+        let p, alt;
+        const k = S.kind[i];
+        if (k === 0) {
+          const wl = S.wells[S.own[i]]; S.ph[i] += S.w[i] * dt;
+          const a = S.ph[i], rr = S.r[i], c = Math.cos(rr), s = Math.sin(rr), e1 = wl.b[0], e2 = wl.b[1], ca = Math.cos(a), sa = Math.sin(a);
+          p = [wl.u[0] * c + (e1[0] * ca + e2[0] * sa) * s, wl.u[1] * c + (e1[1] * ca + e2[1] * sa) * s, wl.u[2] * c + (e1[2] * ca + e2[2] * sa) * s];
+          alt = 1 + S.hh[i] * (1 + Math.sin(T * 1.7 + i));
+        } else if (k === 1) {
+          const L = S.links[S.lk[i]], wa = S.wells[L.a].u;
+          S.t[i] += S.sp[i] * dt; if (S.t[i] > 1) S.t[i] -= 1;
+          const tt = S.t[i], wb = S.wells[L.b].u;
+          let q = slerp(wa, wb, tt);
+          if (L.mix < 1) q = slerp(slerp(wa, S.wells[L.from].u, tt), q, L.mix * L.mix * (3 - 2 * L.mix));
+          p = q; alt = 1 + S.hh[i] * Math.sin(Math.PI * tt) * (.85 + .15 * Math.sin(T * 2 + i));
+        } else {
+          // polvo: deriva lenta por toda la esfera
+          const a = S.ph[i] * 6.2832 + T * S.w[i], z = S.r[i] * 2 - 1, rr = Math.sqrt(1 - z * z);
+          p = [rr * Math.cos(a), z, rr * Math.sin(a)]; alt = 1.002;
+        }
+        // rotación + proyección
+        const x = (m[0] * p[0] + m[1] * p[1] + m[2] * p[2]) * alt, y = (m[3] * p[0] + m[4] * p[1] + m[5] * p[2]) * alt, z = (m[6] * p[0] + m[7] * p[1] + m[8] * p[2]) * alt;
+        const f = cam / (cam - z), sx = (cx + x * R * f) | 0, sy = (cy - y * R * f) | 0;
+        if (sx < 0 || sy < 0 || sx >= W || sy >= H) continue;
+        // la esfera invisible tapa lo que hay detrás: de la cara oculta solo se ve lo que asoma por el borde (protuberancias)
+        if (z < 0 && Math.hypot(x, y) < Math.sqrt(1 - .02) ) continue;
+        const front = z >= 0, a = (front ? (.5 + .5 * z) : .5) * S.bri[i];
+        const col = front || S.kind[i] !== 2 ? CREAM : INK, idx = sy * W + sx, prev = px[idx];
+        // mezcla aditiva sencilla en RGBA (little-endian: 0xAABBGGRR)
+        const pa = prev >>> 24, na = Math.min(255, pa + (a * 255 | 0));
+        const mix = (sh, c) => { const pc = (prev >>> sh) & 255; return pa ? Math.round(pc + (c - pc) * a) : c; };
+        const v = (na << 24) | (mix(16, col[2]) << 16) | (mix(8, col[1]) << 8) | mix(0, col[0]);
+        px[idx] = v;
+        if (S.kind[i] !== 2 && sx + 1 < W && sy + 1 < H) {   // páginas de libros: punto de 2×2 (el polvo de relleno, de 1 px)
+          const o = (q, add) => { const pv = px[q], qa = pv >>> 24; px[q] = qa > (v >>> 24) ? pv : v; };
+          o(idx + 1); o(idx + W); o(idx + W + 1);
+        }
+      }
+      bctx.putImageData(img, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      if (SUN.glow !== false) { ctx.globalAlpha = .55; ctx.filter = `blur(${Math.round(5 * scale)}px)`; ctx.drawImage(buf, 0, 0); }   // resplandor
+      ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.drawImage(buf, 0, 0);
+      // si el móvil va justo, reduce puntos (una sola vez)
+      if (dt > .034) slow++; else slow = Math.max(0, slow - 1);
+      if (slow > 90) { if (S.n > 6000) S.n = Math.round(S.n * .6); else SUN.glow = false; slow = 0; }
+      SUN.raf = requestAnimationFrame(frame);
+    };
+    SUN.raf = requestAnimationFrame(frame);
+  }
+  function stopSun() { SUN.on = false; cancelAnimationFrame(SUN.raf); }
+  addEventListener('resize', () => SUN.on && SUN.resize?.());
+  document.addEventListener('visibilitychange', () => { if (document.hidden) stopSun(); else if (homeOn && isPhone()) startSun(); });
+
   // ============================================================ navegación: 5 pestañas, Home en el centro
   // Biblioteca · Info · Home · Scan · Catálogo
   function showHome() {
@@ -1117,11 +1305,7 @@
     history.replaceState(null, '', location.pathname);
     cameraFor(false); renderHome();
   }
-  function renderHome() {
-    const n = books().length, sh = (() => { try { return cleanLibrary(getLibrary()).shelves.length; } catch { return 0; } })();
-    $id('homeN').textContent = n.toLocaleString('es-ES');
-    $id('homeSub').textContent = `${n === 1 ? 'libro' : 'libros'}${sh ? ` · ${sh} ${sh === 1 ? 'estantería' : 'estanterías'}` : ''}`;
-  }
+  function renderHome() { if (!$id('homeView').hidden) startSun(); }
   function buildNav() {
     const nav = document.querySelector('.tabs');
     if (!nav || $id('tabHome')) return;
@@ -1129,16 +1313,13 @@
     nav.insertAdjacentHTML('beforeend', `<button id="tabHome" class="home" aria-label="Inicio" title="Inicio">${svg('home')}</button>`);
     ['tabLib', 'tabData', 'tabHome', 'tabScan', 'tabCat'].forEach(id => $id(id) && nav.append($id(id)));
     $id('libView').insertAdjacentHTML('afterend', `
-      <div id="homeView" class="homev" hidden>
-        <div class="hmid"><b id="homeN">0</b><span id="homeSub" class="mono-caps"></span></div>
-        <div class="hname">BiblioScan</div>
-      </div>`);
+      <div id="homeView" class="homev" hidden><canvas id="sunCanvas" aria-label="Tu biblioteca como un sol de páginas"></canvas></div>`);
     $id('tabHome').onclick = showHome;
     ['tabScan', 'tabCat', 'tabLib'].forEach(id => $id(id).addEventListener('click', () => {   // después del setTab de index.html
-      homeOn = false; $id('homeView').hidden = true; $id('tabHome').classList.remove('active');
+      homeOn = false; $id('homeView').hidden = true; $id('tabHome').classList.remove('active'); stopSun();
       cameraFor(id === 'tabScan' && !!scanMode);
     }));
-    new MutationObserver(() => { if (homeOn) renderHome(); }).observe($id('catCount'), { childList: true, characterData: true, subtree: true });
+    new MutationObserver(() => { if (homeOn) { stopSun(); renderHome(); } }).observe($id('catCount'), { childList: true, characterData: true, subtree: true });
     showHome();
   }
 

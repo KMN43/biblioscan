@@ -80,6 +80,7 @@
   /* ---- Home ---- */
   .homev { flex: 1; min-height: 0; background: var(--orange); display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
   .homev[hidden] { display: none; }
+  #sunCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
   .hmid { text-align: center; }
   .hmid b { display: block; font: 500 120px/.9 'Space Grotesk', sans-serif; letter-spacing: -.06em; }
   .hmid span { display: block; margin-top: 10px; }
