@@ -42,7 +42,11 @@
 .upd b { display: block; font: 500 17px/1.1 'Space Grotesk', sans-serif; }
 .upd span { display: block; color: #a6a39c; margin-top: 3px; }
 .upd .ibtn { border-color: #57554f; color: var(--paper); }
-.upd .ibtn.primary { color: var(--ink); border-color: var(--orange); }
+.upd .ibtn.primary, .upd .ibtn[data-pri] { color: var(--ink); border-color: var(--orange); }
+.upd { overflow: hidden; }
+.updbar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; opacity: 0; transition: opacity .2s; }
+.upd.dl .updbar { opacity: 1; }
+.updbar i { display: block; height: 100%; width: 0; background: var(--orange); transition: width .2s; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } }
 
 /* ---- hoja inferior (acciones ⋯, nueva balda) ---- */

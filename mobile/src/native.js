@@ -362,7 +362,7 @@
           <div class="datab">
             <div class="infoh"><div class="ilogo">B/S</div><div><b>BiblioScan</b><span class="mono-caps">Versión ${escH(window.BIBLIO_VERSION || '—')}</span></div></div>
             <a class="ilink mono-caps" href="https://github.com/KMN43/biblioscan" target="_blank" rel="noopener">${svg('ext')}<span>github.com/KMN43/biblioscan</span></a>
-            <div class="btns iupd">${ib('updCheck', 'rotate', 'Buscar actualizaciones')}<a id="updGet" class="ibtn primary" hidden aria-label="Descargar e instalar" title="Descargar e instalar">${svg('download')}</a><span id="updMsg" class="mono-caps"></span></div>
+            <div class="btns iupd">${ib('updCheck', 'rotate', 'Buscar actualizaciones')}<button id="updGet" class="ibtn primary" hidden aria-label="Descargar e instalar" title="Descargar e instalar">${svg('download')}</button><span id="updMsg" class="mono-caps"></span></div>
             <div class="mono-caps lbl">Copia de seguridad</div>
             <p>Tu biblioteca se guarda solo en este móvil. Exporta una copia de vez en cuando, o pásala al ordenador
                (el archivo <b>.db</b> es el mismo <i>biblioteca.db</i> que usa BiblioScan.exe).</p>
@@ -395,7 +395,10 @@
       msg.textContent = 'Buscando…'; get.hidden = true; $('updCheck').disabled = true;
       try {
         const u = await latestRelease();
-        if (u.apk && newer(u.tag, window.BIBLIO_VERSION)) { msg.textContent = `Nueva versión ${u.tag.replace(/^v/i, '')}`; get.href = u.apk; get.hidden = false; }
+        if (u.apk && newer(u.tag, window.BIBLIO_VERSION)) {
+          msg.textContent = `Nueva versión ${u.tag.replace(/^v/i, '')}`; get.hidden = false;
+          get.onclick = () => installUpdate(u.apk, { msg: t => { msg.textContent = t; }, progress: pct => { msg.textContent = pct >= 0 ? `Descargando ${pct} %` : 'Descargando…'; } });
+        }
         else msg.textContent = 'Tienes la última versión';
       } catch { msg.textContent = 'Sin conexión con GitHub'; }
       $('updCheck').disabled = false;
@@ -890,6 +893,36 @@
     const rel = JSON.parse(body), apk = (rel.assets || []).find(a => /\.apk$/i.test(a.name));
     return { tag: rel.tag_name, apk: apk?.browser_download_url || null };
   }
+  // descarga la APK dentro de la app y abre el instalador de Android (un toque: «Actualizar»)
+  const Installer = NATIVE ? CAP.registerPlugin('ApkInstaller') : null;
+  let installing = false;
+  const waitVisible = () => new Promise(res => {
+    const f = () => { if (!document.hidden) { document.removeEventListener('visibilitychange', f); res(); } };
+    document.addEventListener('visibilitychange', f);
+  });
+  async function installUpdate(url, ui) {
+    if (!Installer) { location.href = url; return; }          // navegador: descarga normal
+    if (installing) return;
+    installing = true;
+    try {
+      if (!(await Installer.canInstall()).allowed) {           // solo la primera vez
+        ui.msg('Activa «Permitir de esta fuente» y vuelve');
+        await Installer.openInstallSettings();
+        await waitVisible();
+        if (!(await Installer.canInstall()).allowed) { ui.msg('Sin permiso para instalar · vuelve a intentarlo'); return; }
+      }
+      ui.progress(0);
+      const h = await Installer.addListener('progress', p => ui.progress(p.percent));
+      let res;
+      try { res = await Installer.download({ url }); } finally { h.remove(); }
+      ui.msg('Abriendo el instalador…');
+      await Installer.install({ path: res.path });
+    } catch (e) {
+      if (e?.code === 'UNIMPLEMENTED') { location.href = url; return; }
+      ui.msg('No se pudo actualizar: ' + (e?.message || e));
+    } finally { installing = false; }
+  }
+
   async function checkUpdate() {
     const mine = window.BIBLIO_VERSION;
     if (!NATIVE || !mine) return;
@@ -898,10 +931,14 @@
       if (!apk || !newer(latest, mine) || lsGet('skipVersion', '') === latest) return;
       document.body.insertAdjacentHTML('beforeend', `
         <div id="upd" class="upd"><div><b>Nueva versión ${escH(latest.replace(/^v/i, ''))}</b><span class="mono-caps">Tienes la ${escH(mine)}</span></div>
-          <a class="ibtn primary" id="updGo" href="${escH(apk)}" aria-label="Descargar e instalar" title="Descargar e instalar">${svg('download')}</a>
-          ${ib('updNo', 'x', 'Ahora no')}</div>`);
+          ${ib('updGo', 'download', 'Descargar e instalar', 'data-pri')}
+          ${ib('updNo', 'x', 'Ahora no')}<div class="updbar"><i id="updBar"></i></div></div>`);
+      const sub = $id('upd').querySelector('span'), bar = $id('updBar');
       $id('updNo').onclick = () => { lsSet('skipVersion', latest); $id('upd').remove(); };
-      $id('updGo').onclick = () => setTimeout(() => $id('upd')?.remove(), 500);
+      $id('updGo').onclick = () => installUpdate(apk, {
+        msg: t => { sub.textContent = t; },
+        progress: pct => { sub.textContent = pct >= 0 ? `Descargando ${pct} %` : 'Descargando…'; bar.style.width = Math.max(0, pct) + '%'; $id('upd').classList.add('dl'); },
+      });
     } catch {}   // sin conexión o límite de la API de GitHub: ya avisará la próxima vez
   }
 
