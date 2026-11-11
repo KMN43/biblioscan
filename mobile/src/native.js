@@ -356,6 +356,9 @@
     books: '<path d="M3.5 20h17"/><rect x="5" y="7" width="3" height="13"/><rect x="9.5" y="4.5" width="3" height="15.5"/><path d="M14.6 8.2l2.9-.8 3.3 12.2-2.9.8z"/>',
     sliders: '<path d="M5 7h9M18 7h1M5 17h3M12 17h7"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>',
     inbox: '<path d="M4 13.5l2.2-8h11.6l2.2 8V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M4 13.5h4.5l1 2.5h5l1-2.5H20"/>',
+    orbit: '<circle cx="8" cy="13" r="3.2"/><circle cx="16.5" cy="8.5" r="2.4"/><path d="M3.5 18.5c3-6 11-12 17-13.5"/>',
+    qr: '<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2zM18 14h2M14 18h2M18 18h2v2h-2z"/>',
+    share: '<circle cx="17.5" cy="6" r="2.5"/><circle cx="6.5" cy="12" r="2.5"/><circle cx="17.5" cy="18" r="2.5"/><path d="M8.7 10.8l6.6-3.6M8.7 13.2l6.6 3.6"/>',
     home: '<path d="M4 11.2L12 4.5l8 6.7V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/>',
     info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><circle cx="12" cy="7.9" r=".6" fill="currentColor"/>',
     ext: '<path d="M14 4.5h5.5V10M19.5 4.5L11 13M17 14v5.5H4.5V7H10"/>',
@@ -391,6 +394,9 @@
             <div class="infoh"><div class="ilogo">B/S</div><div><b>BiblioScan</b><span class="mono-caps">Versión ${escH(window.BIBLIO_VERSION || '—')}</span></div></div>
             <a class="ilink mono-caps" href="https://github.com/KMN43/biblioscan" target="_blank" rel="noopener">${svg('ext')}<span>github.com/KMN43/biblioscan</span></a>
             <div class="btns iupd">${ib('updCheck', 'rotate', 'Buscar actualizaciones')}<button id="updGet" class="ibtn primary" hidden aria-label="Descargar e instalar" title="Descargar e instalar">${svg('download')}</button><span id="updMsg" class="mono-caps"></span></div>
+            <div class="mono-caps lbl">Compartir BiblioScan</div>
+            <div class="btns">${ib('shareQR', 'qr', 'Mostrar el QR para descargar la app', 'data-pri')}${ib('shareLink', 'share', 'Enviar el enlace de descarga')}</div>
+            <div id="qrBox" class="qrbox" hidden></div>
             <div class="mono-caps lbl">Copia de seguridad</div>
             <p>Tu biblioteca se guarda solo en este móvil. Exporta una copia de vez en cuando, o pásala al ordenador
                (el archivo <b>.db</b> es el mismo <i>biblioteca.db</i> que usa BiblioScan.exe).</p>
@@ -418,6 +424,8 @@
       modal.classList.remove('hidden');
     };
     $('dataClose').onclick = close;
+    $('shareQR').onclick = showShareQR;
+    $('shareLink').onclick = shareLink;
     $('updCheck').onclick = async () => {
       const msg = $('updMsg'), get = $('updGet');
       msg.textContent = 'Buscando…'; get.hidden = true; $('updCheck').disabled = true;
@@ -1330,6 +1338,244 @@
     $id('sunCfgBtn').onclick = () => { paint(); sheet.hidden = false; };
   }
 
+  // ============================================================ JUNTAR SOLES (tu sol + el de un amigo simulado)
+  // Modo proximidad: arrastra el sol del amigo hacia el tuyo. Modo colisión: encuentro de galaxias con la física de
+  // Narasimha Rao, Alladin y Narasimhan (1994). Hasta que exista la conexión real entre móviles, el amigo es simulado.
+  const DUO_P = {   // estética elegida con el prototipo «Colisión de Soles»
+    vRatio: 1.15, pRatio: 2.08, halo: 1, tidal: 2.95, speed: .55, far: 22, near: 6, contact: 1.5,
+    bulge: 1.5, tail: .51, pull: .84, repel: .3, transfer: .59, bridgeH: 1.35, damp: .35, heat: 0, spinUp: 1.2, grow: .6, points: 9000,
+  };
+  const DUO = { on: false, mode: lsGet('duoMode', 'prox'), friend: lsGet('duoFriend', 'mid'), raf: 0, suns: null, fx: .5, fy: .27, distS: 20, enc: {}, setup: true, glow: true };
+  const smoothstep = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  function duoFriendList(kind) {
+    const n = { small: 25, mid: 120, big: 400 }[kind] || 120, r = mulberry(hash('amigo:' + kind));
+    return Array.from({ length: n }, () => ({ pages: Math.round(80 + r() * r() * 700) }));
+  }
+  function duoBuild() {
+    const keep = SP;
+    SP = { ...SP, maxPoints: DUO_P.points, minPoints: 3000 };
+    const suns = [buildSun(books()), buildSun(duoFriendList(DUO.friend))];
+    SP = keep;
+    suns.forEach((S, si) => {
+      S.br = new Float32Array(S.n); S.bt = new Float32Array(S.n);
+      for (let i = 0; i < S.n; i++) { S.br[i] = S.rnd(); S.bt[i] = S.rnd(); }
+      S.M = [1, 0, 0, 0, 1, 0, 0, 0, 1]; S.rot = { vx: 0, vy: .08 * (si ? -1 : 1), drag: null };
+    });
+    DUO.suns = suns; DUO.setup = true;
+  }
+  // --- física del encuentro (unidades: R = 1, G (M1 + M2) = 1) ---
+  function duoEncSetup(rStart) {
+    const P = DUO_P, M1 = DUO.suns[0].total, M2 = DUO.suns[1].total, Mt = M1 + M2, E = DUO.enc = { M1, M2, phase: 'run', merged: 0, t: 0 };
+    E.eps = Math.SQRT2 * (1 / 6 + P.halo * (1 / 2 - 1 / 6)) * 2.2;
+    const p = E.p = Math.min(P.pRatio * E.eps, rStart * .8);
+    E.vesc = Math.sqrt(2 / Math.sqrt(p * p + E.eps * E.eps)); E.vp = P.vRatio * E.vesc; E.h = p * E.vp; E.bound = P.vRatio <= 1.0001;
+    E.xi = [M2, M1].map(Mo => 3 * (2 * Mo / Mt) * .5 / (E.vp * E.vp * E.eps) * Math.exp(-p / E.eps)); E.acc = [0, 0];
+    if (!E.bound) {
+      E.vinf = Math.sqrt(Math.max(1e-6, E.vp * E.vp - E.vesc * E.vesc));
+      const pe = p / E.eps, a = pe <= .5 ? 1 : pe <= 1.2 ? 1.5 : 2;
+      E.phi = Math.max(.02, Math.min(Math.PI * .97, a * (1 - Math.exp(-pe)) * Math.atan(1 / (E.h * E.vinf))));
+      E.e = 1 / Math.sin(E.phi / 2); E.ell = p * (1 + E.e); E.thInf = Math.acos(-1 / E.e);
+      E.th0 = -Math.acos(Math.max(-1, Math.min(1, (E.ell / rStart - 1) / E.e))); E.theta = E.th0; E.rot = -E.th0;
+    } else {
+      const r0 = rStart, En = E.vp * E.vp / 2 - 1 / Math.sqrt(p * p + E.eps * E.eps), v0 = Math.sqrt(Math.max(0, 2 * (En + 1 / Math.sqrt(r0 * r0 + E.eps * E.eps))));
+      const vt = Math.min(v0, E.h / r0); E.r = [r0, 0]; E.v = [-Math.sqrt(Math.max(0, v0 * v0 - vt * vt)), vt];
+    }
+  }
+  function duoEncStep(dt, rStart) {
+    const E = DUO.enc, sp = DUO_P.speed * 1.4;
+    if (E.phase === 'pause') { E.pause -= dt; if (E.pause <= 0) duoEncSetup(rStart); return; }
+    let qx, qy;
+    if (!E.bound) {
+      const r = E.ell / (1 + E.e * Math.cos(E.theta)); E.theta += E.h / (r * r) * dt * sp;
+      const rr = E.ell / (1 + E.e * Math.cos(E.theta)); qx = rr * Math.cos(E.theta + E.rot); qy = rr * Math.sin(E.theta + E.rot);
+      if (E.theta > -E.th0 * 1.25 || E.theta > E.thInf * .995 || rr > rStart * 1.9) { E.phase = 'pause'; E.pause = 1.6; }
+    } else {
+      for (let k = 0; k < 6; k++) {
+        const h = dt * sp / 6, x = E.r[0], y = E.r[1], f = -1 / Math.pow(x * x + y * y + E.eps * E.eps, 1.5), close = Math.max(0, 1 - Math.hypot(x, y) / (E.eps * 1.8));
+        E.v[0] += x * f * h; E.v[1] += y * f * h; E.v[0] *= 1 - close * 1.6 * h; E.v[1] *= 1 - close * 1.6 * h; E.r[0] += E.v[0] * h; E.r[1] += E.v[1] * h;
+      }
+      qx = E.r[0]; qy = E.r[1];
+      if (Math.hypot(qx, qy) < .25) E.merged = Math.min(1, E.merged + dt * .5);
+      if (E.merged >= 1) { E.t += dt; if (E.t > 4) { E.phase = 'pause'; E.pause = 1; } }
+    }
+    E.rel = [qx, qy];
+    const d = Math.hypot(qx, qy), nearF = Math.exp(-Math.pow(Math.max(0, d - E.p) / (E.eps * 1.2), 2)), after = !E.bound ? (E.theta > 0 ? 2 : 1) : 1.5;
+    for (let s = 0; s < 2; s++) E.acc[s] = Math.min(E.xi[s] * 3, E.acc[s] + E.xi[s] * nearF * after * dt * sp * .9);
+  }
+  const xiType = x => x < 1e-3 ? 'A1' : x < 1e-2 ? 'A2' : x < .1 ? 'A3' : x < .4 ? 'B1' : x < .7 ? 'B2' : x < 1 ? 'B3' : 'disrupción';
+
+  function buildDuo() {
+    const hv = $id('homeView'); if (!hv || $id('duo')) return;
+    hv.insertAdjacentHTML('beforeend', `${ib('duoBtn', 'orbit', 'Juntar soles')}
+      <div id="duo" class="duo" hidden>
+        <canvas id="duoCanvas" aria-label="Tu sol y el de un amigo"></canvas>
+        <div class="duotop">${ib('duoBack', 'prev', 'Volver')}
+          <div class="dseg" role="group" aria-label="Modo"><button id="duoProx" type="button">Proximidad</button><button id="duoEnc" type="button">Colisión</button></div>
+          ${ib('duoAgain', 'rotate', 'Repetir la colisión')}</div>
+        <div class="duohud mono-caps" id="duoHud"></div>
+        <div class="duofoot"><select id="duoFriend" aria-label="Biblioteca del amigo">
+          <option value="small">Amigo con 25 libros</option><option value="mid">Amigo con 120 libros</option><option value="big">Amigo con 400 libros</option></select>
+          <span class="mono-caps" id="duoHint"></span></div>
+      </div>`);
+    $id('duoFriend').value = DUO.friend;
+    $id('duoBtn').onclick = openDuo;
+    $id('duoBack').onclick = closeDuo;
+    $id('duoProx').onclick = () => setDuoMode('prox');
+    $id('duoEnc').onclick = () => setDuoMode('enc');
+    $id('duoAgain').onclick = () => { DUO.setup = true; };
+    $id('duoFriend').onchange = e => { DUO.friend = e.target.value; lsSet('duoFriend', DUO.friend); duoBuild(); };
+    // arrastrar: en proximidad mueve el sol del amigo; en colisión, gira el sol que tocas
+    const cv = $id('duoCanvas'); let drag = null;
+    cv.addEventListener('pointerdown', e => { cv.setPointerCapture?.(e.pointerId); drag = { x: e.clientX, y: e.clientY, fx: DUO.fx, fy: DUO.fy, t: performance.now(), si: e.clientY < cv.clientHeight / 2 ? 1 : 0 }; });
+    cv.addEventListener('pointermove', e => {
+      if (!drag) return;
+      if (DUO.mode === 'prox') {
+        DUO.fx = Math.max(.08, Math.min(.92, drag.fx + (e.clientX - drag.x) / cv.clientWidth));
+        DUO.fy = Math.max(.08, Math.min(.92, drag.fy + (e.clientY - drag.y) / cv.clientHeight));
+      } else {
+        const S = DUO.suns[drag.si], now = performance.now(), dt = Math.max(8, now - drag.t) / 1000, k = .8 / Math.min(cv.clientWidth, cv.clientHeight);
+        const dx = (e.clientX - drag.x) * k, dy = (e.clientY - drag.y) * k;
+        S.M = rotY(dx, rotX(dy, S.M)); S.rot.vx = S.rot.vx * .4 + dy / dt * .6; S.rot.vy = S.rot.vy * .4 + dx / dt * .6;
+        drag.x = e.clientX; drag.y = e.clientY; drag.t = now;
+      }
+    });
+    const up = () => { drag = null; };
+    cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  }
+  function setDuoMode(m) {
+    DUO.mode = m; lsSet('duoMode', m); DUO.setup = true;
+    $id('duoProx').classList.toggle('on', m === 'prox'); $id('duoEnc').classList.toggle('on', m === 'enc');
+    $id('duoAgain').hidden = m !== 'enc';
+    $id('duoHint').textContent = m === 'prox' ? 'Arrastra el sol del amigo hacia el tuyo' : 'Arrastra un sol para girarlo';
+    if (m === 'prox') { DUO.fx = .5; DUO.fy = .27; }
+  }
+  function openDuo() {
+    stopSun(); $id('duo').hidden = false; $id('sunCfgBtn').hidden = true; $id('duoBtn').hidden = true;
+    if (!DUO.suns) duoBuild();
+    setDuoMode(DUO.mode); startDuo();
+  }
+  function closeDuo() {
+    stopDuo(); $id('duo').hidden = true; $id('sunCfgBtn').hidden = false; $id('duoBtn').hidden = false; startSun();
+  }
+  const rotX = (a, m) => { const c = Math.cos(a), s = Math.sin(a); return [m[0], m[1], m[2], c * m[3] - s * m[6], c * m[4] - s * m[7], c * m[5] - s * m[8], s * m[3] + c * m[6], s * m[4] + c * m[7], s * m[5] + c * m[8]]; };
+  const rotY = (a, m) => { const c = Math.cos(a), s = Math.sin(a); return [c * m[0] + s * m[6], c * m[1] + s * m[7], c * m[2] + s * m[8], m[3], m[4], m[5], -s * m[0] + c * m[6], -s * m[1] + c * m[7], -s * m[2] + c * m[8]]; };
+
+  function startDuo() {
+    if (DUO.on) return; DUO.on = true;
+    const cv = $id('duoCanvas'), ctx = cv.getContext('2d'), buf = document.createElement('canvas'), bctx = buf.getContext('2d');
+    let W = 0, H = 0, img, px, scale = 1, last = performance.now(), slow = 0;
+    const size = () => {
+      scale = Math.min(devicePixelRatio || 1, 1.5);
+      W = Math.max(1, Math.round(cv.clientWidth * scale)); H = Math.max(1, Math.round(cv.clientHeight * scale));
+      cv.width = buf.width = W; cv.height = buf.height = H; img = bctx.createImageData(W, H); px = new Uint32Array(img.data.buffer); DUO.setup = true;
+    };
+    size(); DUO.resize = size;
+    const PT = hexRgb(SP.ptColor), HOT = [255, 255, 255], BGC = SP.bgColor;
+    const frame = now => {
+      if (!DUO.on) return;
+      const P = DUO_P, dt = Math.min(.05, (now - last) / 1000); last = now; const T = now / 1000;
+      const R = Math.min(W, H) * .2, pxPerCm = W / 7;          // una pantalla ≈ 7 cm de ancho
+      const A = [W / 2, H * .72], B = DUO.mode === 'prox' ? [DUO.fx * W, DUO.fy * H] : [W / 2, H * .28];
+      const vx0 = B[0] - A[0], vy0 = B[1] - A[1], cd = Math.hypot(vx0, vy0) || 1, ux = vx0 / cd, uy = vy0 / cd;
+      const st = [{}, {}];
+      let hudTxt = '';
+      if (DUO.mode === 'prox') {
+        const gapCm = Math.max(0, cd - 2 * R) / pxPerCm;
+        DUO.distS += (gapCm - DUO.distS) * (1 - Math.exp(-dt / P.damp));
+        const K = 1 - smoothstep(P.near, P.far, DUO.distS), C = 1 - smoothstep(P.contact * .5, P.contact * 1.6 + .2, DUO.distS);
+        for (let si = 0; si < 2; si++) {
+          const dir = si ? -1 : 1, pull = dir * (P.pull * K - P.repel * C) * R * .9, H0 = si ? B : A;
+          st[si] = { cx: H0[0] + ux * pull, cy: H0[1] + uy * pull, d: [dir * ux, dir * uy], K, C, spin: dir };
+        }
+        hudTxt = `${DUO.distS.toFixed(1)} cm · ${C > .5 ? 'contacto' : K > .5 ? 'cerca' : K > .02 ? 'se notan' : 'lejos'}`;
+      } else {
+        const rStart = cd / R;
+        if (DUO.setup) { duoEncSetup(rStart); DUO.setup = false; }
+        duoEncStep(dt, rStart);
+        const E = DUO.enc, rel = E.rel || [rStart, 0], psi = Math.atan2(uy, ux), Mt = E.M1 + E.M2;
+        const qx = rel[0] * Math.cos(psi) + rel[1] * Math.sin(psi), qy = rel[0] * Math.sin(psi) - rel[1] * Math.cos(psi);
+        const bx = (E.M1 * A[0] + E.M2 * B[0]) / Mt, by = (E.M1 * A[1] + E.M2 * B[1]) / Mt;
+        const c = [[bx - qx * R * E.M2 / Mt, by - qy * R * E.M2 / Mt], [bx + qx * R * E.M1 / Mt, by + qy * R * E.M1 / Mt]];
+        const dist = Math.hypot(qx, qy), dx = qx / (dist || 1), dy = qy / (dist || 1), contact = 1 - smoothstep(E.eps * .35, E.eps * 1.3, dist);
+        for (let si = 0; si < 2; si++) {
+          const K = Math.min(1.4, E.acc[si] * P.tidal + (1 - smoothstep(E.eps * .8, E.eps * 3.5, dist)) * .35);
+          st[si] = { cx: c[si][0], cy: c[si][1], d: si ? [-dx, -dy] : [dx, dy], K, C: contact, spin: si ? -1 : 1, merge: E.merged };
+        }
+        hudTxt = E.bound ? `fusión ${Math.round(E.merged * 100)} % · ξ ${xiType(E.xi[0])}` : `desviación ${(E.phi * 180 / Math.PI).toFixed(1)}° · marea ${xiType(E.xi[0])} / ${xiType(E.xi[1])}`;
+      }
+      st[0].ox = st[1].cx; st[0].oy = st[1].cy; st[1].ox = st[0].cx; st[1].oy = st[0].cy;
+      $id('duoHud').textContent = hudTxt;
+      px.fill(0);
+      for (let si = 0; si < 2; si++) {
+        const S = DUO.suns[si], o = st[si], K = o.K, C = o.C, Rs = R * (1 + P.grow * Math.min(1, K)) * (1 - .25 * (o.merge || 0));
+        const dwx = o.d[0], dwy = -o.d[1], m0 = S.rot;
+        if (!m0.drag) { const f = 1 - Math.exp(-dt * SP.inertia), base = .08 * (1 + P.spinUp * Math.min(1, K)) * o.spin; m0.vx += -m0.vx * f; m0.vy += (base - m0.vy) * f; S.M = rotY(m0.vy * dt, rotX(m0.vx * dt, S.M)); }
+        for (const wl of S.wells) { wl.u = norm3(rotAxis(wl.u, wl.axis, wl.spin * SP.drift * dt)); wl.b = basis(wl.u); }
+        S.rewireAt -= dt; if (S.rewireAt <= 0) { rewire(S); S.rewireAt = SP.rewire * (.67 + S.rnd() * .66); }
+        for (const l of S.links) if (l.mix < 1) l.mix = Math.min(1, l.mix + dt / SP.morph);
+        const m = S.M, cam = SP.cam;
+        for (let i = 0; i < S.n; i++) {
+          let p, alt; const k = S.kind[i];
+          if (k === 2) continue;
+          if (k === 0) { const wl = S.wells[S.own[i]]; S.ph[i] += S.w[i] * SP.swirl * (1 + P.spinUp * Math.min(1, K) * .5) * dt;
+            const a = S.ph[i], rr = S.r[i], c = Math.cos(rr), s = Math.sin(rr), e1 = wl.b[0], e2 = wl.b[1], ca = Math.cos(a), sa = Math.sin(a);
+            p = [wl.u[0] * c + (e1[0] * ca + e2[0] * sa) * s, wl.u[1] * c + (e1[1] * ca + e2[1] * sa) * s, wl.u[2] * c + (e1[2] * ca + e2[2] * sa) * s]; alt = 1 + S.hh[i] * (1 + Math.sin(T * 1.7 + i)); }
+          else { const L = S.links[S.lk[i]], wa = S.wells[L.a].u, wb = S.wells[L.b].u; S.t[i] += S.sp[i] * SP.arcSpeed * dt; if (S.t[i] > 1) S.t[i] -= 1;
+            const tt = S.t[i]; let q = slerp(wa, wb, tt); if (L.mix < 1) q = slerp(slerp(wa, S.wells[L.from].u, tt), q, L.mix * L.mix * (3 - 2 * L.mix));
+            p = q; alt = 1 + S.hh[i] * SP.arcHeight * Math.sin(Math.PI * tt) * (.85 + .15 * Math.sin(T * 2 + i)); }
+          let x = (m[0] * p[0] + m[1] * p[1] + m[2] * p[2]) * alt, y = (m[3] * p[0] + m[4] * p[1] + m[5] * p[2]) * alt, z = (m[6] * p[0] + m[7] * p[1] + m[8] * p[2]) * alt;
+          const face = Math.max(0, x * dwx + y * dwy), amt = K * (P.bulge * face * face + (k === 1 ? P.tail * face * face * face : 0)) * .9;
+          x += dwx * amt; y += dwy * amt;
+          const f = cam / (cam - z); let sx = o.cx + x * Rs * f, sy = o.cy - y * Rs * f, hot = Math.min(1, K) * face * P.heat;
+          if (k === 1 && C > 0 && S.br[i] < P.transfer) {
+            S.bt[i] += dt * (.18 + S.sp[i] * 2); if (S.bt[i] > 1) S.bt[i] -= 1;
+            const bt = S.bt[i], tx = o.ox - o.d[0] * R * .85, ty = o.oy - o.d[1] * R * .85, nx = -o.d[1], ny = o.d[0];
+            const lift = Math.sin(Math.PI * bt) * P.bridgeH * R * (.4 + S.hh[i] * 2);
+            sx += ((sx + (tx - sx) * bt + nx * lift) - sx) * C; sy += ((sy + (ty - sy) * bt + ny * lift) - sy) * C; hot = Math.max(hot, C * P.heat);
+          }
+          if (z < 0) continue;
+          const lx = sx | 0, ly = sy | 0;
+          if (lx < 0 || ly < 0 || lx >= W - 1 || ly >= H - 1) continue;
+          const a = Math.min(1, SP.front * (1 + z) * S.bri[i] * (1 + hot * .8));
+          const r0 = PT[0] + (HOT[0] - PT[0]) * hot, g0 = PT[1] + (HOT[1] - PT[1]) * hot, b0 = PT[2] + (HOT[2] - PT[2]) * hot;
+          const idx = ly * W + lx, prev = px[idx], pa = prev >>> 24, na = Math.min(255, pa + (a * 255 | 0));
+          const mix = (sh, cc) => { const pc = (prev >>> sh) & 255; return pa ? Math.round(pc + (cc - pc) * a) : cc | 0; };
+          const val = (na << 24) | (mix(16, b0) << 16) | (mix(8, g0) << 8) | mix(0, r0);
+          px[idx] = val; if ((px[idx + 1] >>> 24) < na) px[idx + 1] = val; if ((px[idx + W] >>> 24) < na) px[idx + W] = val; if ((px[idx + W + 1] >>> 24) < na) px[idx + W + 1] = val;
+        }
+      }
+      bctx.putImageData(img, 0, 0);
+      ctx.fillStyle = BGC; ctx.fillRect(0, 0, W, H);
+      if (DUO.glow) { ctx.globalAlpha = SP.glowAlpha; ctx.filter = `blur(${Math.round(SP.glowBlur * scale)}px)`; ctx.drawImage(buf, 0, 0); }
+      ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.drawImage(buf, 0, 0);
+      if (dt > .034) slow++; else slow = Math.max(0, slow - 1);
+      if (slow > 90) { const S0 = DUO.suns; if (S0[0].n > 4000) S0.forEach(S => { S.n = Math.round(S.n * .7); }); else DUO.glow = false; slow = 0; }
+      DUO.raf = requestAnimationFrame(frame);
+    };
+    DUO.raf = requestAnimationFrame(frame);
+  }
+  function stopDuo() { DUO.on = false; cancelAnimationFrame(DUO.raf); }
+  addEventListener('resize', () => DUO.on && DUO.resize?.());
+  document.addEventListener('visibilitychange', () => { if (document.hidden) stopDuo(); else if (homeOn && !$id('duo')?.hidden) startDuo(); });
+
+  // ============================================================ compartir la app (pestaña Info)
+  const APP_URL = 'https://github.com/KMN43/biblioscan/releases/latest/download/BiblioScan.apk';
+  function showShareQR() {
+    const box = $id('qrBox');
+    if (!box.hidden) { box.hidden = true; return; }
+    try {
+      const q = qrcode(0, 'M'); q.addData(APP_URL); q.make();
+      box.innerHTML = `<div class="qrsvg">${q.createSvgTag(6, 2)}</div><p class="mono-caps">Escanéalo con la cámara del otro móvil · descarga directa de BiblioScan.apk</p><p class="qrurl">${escH(APP_URL)}</p>`;
+    } catch (e) { box.textContent = 'No se pudo generar el QR: ' + (e?.message || e); }
+    box.hidden = false;
+  }
+  async function shareLink() {
+    try {
+      if (NATIVE) await Share.share({ title: 'BiblioScan', text: 'Descarga BiblioScan para Android', url: APP_URL, dialogTitle: 'Compartir BiblioScan' });
+      else { await navigator.clipboard.writeText(APP_URL); mtoast('Enlace copiado'); }
+    } catch (e) { if (!/cancel/i.test(String(e?.message || e))) mtoast('No se pudo compartir'); }
+  }
+
   // ============================================================ navegación: 5 pestañas, Home en el centro
   // Biblioteca · Info · Home · Scan · Catálogo
   function showHome() {
@@ -1349,7 +1595,7 @@
     ['tabLib', 'tabData', 'tabHome', 'tabScan', 'tabCat'].forEach(id => $id(id) && nav.append($id(id)));
     $id('libView').insertAdjacentHTML('afterend', `
       <div id="homeView" class="homev" hidden><canvas id="sunCanvas" aria-label="Tu biblioteca como un sol de páginas"></canvas></div>`);
-    buildSunConfig();
+    buildSunConfig(); buildDuo();
     $id('tabHome').onclick = showHome;
     ['tabScan', 'tabCat', 'tabLib'].forEach(id => $id(id).addEventListener('click', () => {   // después del setTab de index.html
       homeOn = false; $id('homeView').hidden = true; $id('tabHome').classList.remove('active'); stopSun();

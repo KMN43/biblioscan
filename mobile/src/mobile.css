@@ -315,3 +315,28 @@
 .sc span { font: 400 14px 'Space Grotesk', sans-serif; }
 .sc output { color: var(--muted); font-variant-numeric: tabular-nums; }
 .sc input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--orange); margin: 0; }
+
+/* ---- compartir la app (Info) ---- */
+.qrbox { background: #fff; border-radius: 14px; padding: 14px; margin: 4px 0 12px; text-align: center; }
+.qrbox[hidden] { display: none; }
+.qrsvg svg { width: min(62vw, 240px); height: auto; display: block; margin: 0 auto; }
+.qrbox p { margin: 10px 0 0; color: var(--muted); }
+.qrbox .qrurl { font-size: 10px; word-break: break-all; color: var(--ink); }
+
+/* ---- juntar soles (Home) ---- */
+#duoBtn { position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); left: 14px; z-index: 2;
+          border-color: rgba(18,18,18,.55); background: rgba(236,235,230,.18); }
+#duoBtn[hidden], #sunCfgBtn[hidden] { display: none; }
+.duo { position: absolute; inset: 0; z-index: 3; background: var(--orange); }
+.duo[hidden] { display: none; }
+#duoCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.duotop { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); left: 12px; right: 12px; display: flex; align-items: center; gap: 8px; z-index: 2; }
+.duotop .ibtn { background: rgba(236,235,230,.85); border-color: transparent; }
+.duotop .ibtn[hidden] { display: none; }
+.dseg { flex: 1; display: flex; border: 1px solid var(--ink); border-radius: 22px; overflow: hidden; background: rgba(236,235,230,.6); }
+.dseg button { flex: 1; border: none; border-radius: 0; padding: 10px 6px; font-size: 11px; }
+.dseg button.on { background: var(--ink); color: var(--paper); }
+.duohud { position: absolute; left: 0; right: 0; top: calc(66px + env(safe-area-inset-top, 0px)); text-align: center; color: var(--ink); z-index: 2; pointer-events: none; }
+.duofoot { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 8px; align-items: center; z-index: 2; }
+.duofoot select { width: 100%; max-width: 320px; border-radius: 22px; background: rgba(236,235,230,.85); }
+.duofoot span { color: rgba(18,18,18,.7); }

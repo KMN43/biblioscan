@@ -14,6 +14,7 @@
     "@capacitor/core": "^8.6.0",
     "@capacitor/filesystem": "^8.1.5",
     "@capacitor/share": "^8.0.3",
+    "qrcode-generator": "^1.4.4",
     "sql.js": "^1.15.2"
   },
   "devDependencies": {
