@@ -1465,7 +1465,7 @@
     try {
       if (!LINK.subs) LINK.subs = ['found', 'connected', 'disconnected', 'message', 'rssi', 'error'].map(ev => SunLink.addListener(ev, d => linkEvent(ev, d)));
       const p = await SunLink.ensurePermissions();
-      if (!p.granted) { LINK.state = 'perm'; return; }
+      if (!p.granted) { LINK.state = p.locationOff ? 'loc' : 'perm'; return; }
       LINK.tag = linkTag(); LINK.state = 'search';
       await SunLink.start({ tag: LINK.tag });
     } catch (e) { LINK.state = 'error'; LINK.err = e.message || String(e); }
@@ -1568,9 +1568,9 @@
         } else {
           st[0] = { cx: A[0], cy: A[1], d: [0, -1], K: 0, C: 0, spin: 1 };
           const S = LINK.state;
-          hudTxt = S === 'nativo' ? 'Solo en la app de Android' : S === 'perm' ? 'Sin permiso de dispositivos cercanos' : S === 'error' ? 'No se pudo buscar'
+          hudTxt = S === 'nativo' ? 'Solo en la app de Android' : S === 'perm' ? 'Faltan permisos' : S === 'loc' ? 'La ubicación está apagada' : S === 'error' ? 'No se pudo buscar'
             : S === 'on' ? 'Conectado · recibiendo su sol…' : S === 'found' ? 'Sol encontrado · conectando…' : 'Buscando otro sol cerca' + '.'.repeat(1 + (T | 0) % 3);
-          hint = S === 'perm' ? 'Permite «Dispositivos cercanos» y vuelve a entrar' : S === 'error' ? LINK.err
+          hint = S === 'perm' ? 'Permite «Dispositivos cercanos» y «Ubicación» y vuelve a entrar' : S === 'loc' ? 'Enciende la ubicación del móvil (la pide Android para buscar por Bluetooth) y vuelve a entrar' : S === 'error' ? LINK.err
             : 'Pide a tu amigo que abra Juntar soles → Proximidad';
           if (LINK.err && S !== 'error') hint = LINK.err;
         }

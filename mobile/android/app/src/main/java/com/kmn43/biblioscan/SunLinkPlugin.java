@@ -13,6 +13,7 @@ import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
 import android.content.Context;
+import android.location.LocationManager;
 import android.os.Build;
 import android.os.ParcelUuid;
 
@@ -85,13 +86,21 @@ public class SunLinkPlugin extends Plugin {
         List<String> a = new ArrayList<>();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) a.add("bt");
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) a.add("wifi");
-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2) a.add("location");   // Nearby lo exige hasta Android 12
+        a.add("location");   // Nearby Connections la exige en todas las versiones (error 8034 si falta)
         return a.toArray(new String[0]);
     }
 
     private boolean allGranted() {
         for (String alias : aliasesNeeded()) if (getPermissionState(alias) != PermissionState.GRANTED) return false;
-        return true;
+        return locationOn();
+    }
+
+    /** Nearby también necesita la ubicación del sistema encendida. */
+    private boolean locationOn() {
+        try {
+            LocationManager lm = (LocationManager) getContext().getSystemService(Context.LOCATION_SERVICE);
+            return lm == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.P || lm.isLocationEnabled();
+        } catch (Exception e) { return true; }
     }
 
     private void emitError(String msg) {
@@ -104,6 +113,9 @@ public class SunLinkPlugin extends Plugin {
     @PluginMethod
     public void ensurePermissions(PluginCall call) {
         if (allGranted()) { JSObject r = new JSObject(); r.put("granted", true); call.resolve(r); return; }
+        boolean perms = true;
+        for (String alias : aliasesNeeded()) if (getPermissionState(alias) != PermissionState.GRANTED) perms = false;
+        if (perms) { permsDone(call); return; }
         requestPermissionForAliases(aliasesNeeded(), call, "permsDone");
     }
 
@@ -111,6 +123,7 @@ public class SunLinkPlugin extends Plugin {
     private void permsDone(PluginCall call) {
         JSObject r = new JSObject();
         r.put("granted", allGranted());
+        r.put("locationOff", !locationOn());
         call.resolve(r);
     }
 
