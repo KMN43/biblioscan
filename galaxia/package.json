@@ -1,0 +1,14 @@
+{
+  "name": "biblioscan-galaxia",
+  "private": true,
+  "description": "Servidor de la galaxia BiblioScan (Cloudflare Worker + D1)",
+  "scripts": {
+    "dev": "wrangler dev",
+    "db:local": "wrangler d1 execute biblioscan-galaxia --local --file=schema.sql",
+    "db:remote": "wrangler d1 execute biblioscan-galaxia --remote --file=schema.sql",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.160.0"
+  }
+}

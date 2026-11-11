@@ -1,0 +1,9 @@
+name = "biblioscan-galaxia"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# Base de datos D1 (plan gratuito). database_id se rellena tras `npx wrangler d1 create biblioscan-galaxia`.
+[[d1_databases]]
+binding = "DB"
+database_name = "biblioscan-galaxia"
+database_id = "PENDIENTE"
