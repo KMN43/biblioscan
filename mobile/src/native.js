@@ -1338,34 +1338,38 @@
     $id('sunCfgBtn').onclick = () => { paint(); sheet.hidden = false; };
   }
 
-  // ============================================================ JUNTAR SOLES (tu sol + el de un amigo simulado)
-  // Modo proximidad: arrastra el sol del amigo hacia el tuyo. Modo colisión: encuentro de galaxias con la física de
-  // Narasimha Rao, Alladin y Narasimhan (1994). Hasta que exista la conexión real entre móviles, el amigo es simulado.
+  // ============================================================ JUNTAR SOLES
+  // Proximidad: busca otro móvil cercano con «Juntar soles» abierto; al acercarlos los soles se atraen, se pasan
+  // plasma y, en contacto, colisionan entre las dos pantallas. Colisión: demostración con un amigo simulado.
+  // Física del encuentro: Narasimha Rao, Alladin y Narasimhan (1994).
   const DUO_P = {   // estética elegida con el prototipo «Colisión de Soles»
     vRatio: 1.15, pRatio: 2.08, halo: 1, tidal: 2.95, speed: .55, far: 22, near: 6, contact: 1.5,
     bulge: 1.5, tail: .51, pull: .84, repel: .3, transfer: .59, bridgeH: 1.35, damp: .35, heat: 0, spinUp: 1.2, grow: .6, points: 9000,
   };
-  const DUO = { on: false, mode: lsGet('duoMode', 'prox'), friend: lsGet('duoFriend', 'mid'), raf: 0, suns: null, fx: .5, fy: .27, distS: 20, enc: {}, setup: true, glow: true };
+  const DUO = { on: false, mode: lsGet('duoMode', 'prox'), friend: lsGet('duoFriend', 'mid'), raf: 0, suns: null, mine: null, distS: 20, enc: {}, setup: true, glow: true };
   const smoothstep = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   function duoFriendList(kind) {
     const n = { small: 25, mid: 120, big: 400 }[kind] || 120, r = mulberry(hash('amigo:' + kind));
     return Array.from({ length: n }, () => ({ pages: Math.round(80 + r() * r() * 700) }));
   }
-  function duoBuild() {
+  function duoMakeSun(list, si) {
     const keep = SP;
     SP = { ...SP, maxPoints: DUO_P.points, minPoints: 3000 };
-    const suns = [buildSun(books()), buildSun(duoFriendList(DUO.friend))];
+    const S = buildSun(list);
     SP = keep;
-    suns.forEach((S, si) => {
-      S.br = new Float32Array(S.n); S.bt = new Float32Array(S.n);
-      for (let i = 0; i < S.n; i++) { S.br[i] = S.rnd(); S.bt[i] = S.rnd(); }
-      S.M = [1, 0, 0, 0, 1, 0, 0, 0, 1]; S.rot = { vx: 0, vy: .08 * (si ? -1 : 1), drag: null };
-    });
-    DUO.suns = suns; DUO.setup = true;
+    S.br = new Float32Array(S.n); S.bt = new Float32Array(S.n);
+    for (let i = 0; i < S.n; i++) { S.br[i] = S.rnd(); S.bt[i] = S.rnd(); }
+    S.M = [1, 0, 0, 0, 1, 0, 0, 0, 1]; S.rot = { vx: 0, vy: .08 * (si ? -1 : 1), drag: null };
+    return S;
+  }
+  function duoBuild() {
+    DUO.mine = duoMakeSun(books(), 0);
+    DUO.suns = [DUO.mine, duoMakeSun(duoFriendList(DUO.friend), 1)]; DUO.setup = true;
   }
   // --- física del encuentro (unidades: R = 1, G (M1 + M2) = 1) ---
-  function duoEncSetup(rStart) {
-    const P = DUO_P, M1 = DUO.suns[0].total, M2 = DUO.suns[1].total, Mt = M1 + M2, E = DUO.enc = { M1, M2, phase: 'run', merged: 0, t: 0 };
+  function duoEncSetup(rStart, m1, m2) {
+    const shared = m1 != null, P = DUO_P, M1 = shared ? m1 : DUO.suns[0].total, M2 = shared ? m2 : DUO.suns[1].total, Mt = M1 + M2;
+    const E = DUO.enc = { M1, M2, phase: 'run', merged: 0, t: 0, shared };
     E.eps = Math.SQRT2 * (1 / 6 + P.halo * (1 / 2 - 1 / 6)) * 2.2;
     const p = E.p = Math.min(P.pRatio * E.eps, rStart * .8);
     E.vesc = Math.sqrt(2 / Math.sqrt(p * p + E.eps * E.eps)); E.vp = P.vRatio * E.vesc; E.h = p * E.vp; E.bound = P.vRatio <= 1.0001;
@@ -1383,7 +1387,7 @@
   }
   function duoEncStep(dt, rStart) {
     const E = DUO.enc, sp = DUO_P.speed * 1.4;
-    if (E.phase === 'pause') { E.pause -= dt; if (E.pause <= 0) duoEncSetup(rStart); return; }
+    if (E.phase === 'pause') { E.pause -= dt; if (E.pause <= 0) { if (E.shared) LINK.shared = null; else duoEncSetup(rStart); } return; }
     let qx, qy;
     if (!E.bound) {
       const r = E.ell / (1 + E.e * Math.cos(E.theta)); E.theta += E.h / (r * r) * dt * sp;
@@ -1404,6 +1408,74 @@
   }
   const xiType = x => x < 1e-3 ? 'A1' : x < 1e-2 ? 'A2' : x < .1 ? 'A3' : x < .4 ? 'B1' : x < .7 ? 'B2' : x < 1 ? 'B3' : 'disrupción';
 
+  // ---------- conexión real con otro móvil (complemento nativo SunLink: Nearby Connections + Bluetooth LE) ----------
+  // Se intercambia solo la «huella» (páginas de cada libro, sin títulos ni ISBN). La distancia sale de la señal
+  // Bluetooth que mide cada móvil del otro (media de los dos). Los móviles se juntan por la parte de arriba:
+  // cada pantalla dibuja su sol y el del amigo queda al otro lado del borde superior.
+  const SunLink = NATIVE ? CAP.registerPlugin('SunLink') : null;
+  const LINK = { state: 'off', tag: '', peerTag: '', peerSun: null, peerN: 0, rs: [], peerRssi: null, dist: null, sentAt: 0,
+                 rtt: 120, contactT: 0, armed: true, shared: null, err: '', subs: null };
+  // señal Bluetooth → cm: con los móviles tocándose la señal ronda RSSI_C (−42 dBm); cada 17 dB menos, ×10 la distancia
+  // (−50 ≈ 3 cm · −60 ≈ 13 cm · −70 ≈ 50 cm). Aproximado: depende del móvil, la funda y la mano.
+  const RSSI_C = +lsGet('duoRssiC', -42);
+  function linkDist() {
+    if (!LINK.rs.length) return;
+    const mine = [...LINK.rs].sort((a, b) => a - b)[LINK.rs.length >> 1];
+    const both = LINK.peerRssi == null ? mine : (mine + LINK.peerRssi) / 2;
+    LINK.dist = Math.max(0, Math.min(300, 1.2 * Math.pow(10, (RSSI_C - both) / 17)));
+    return mine;
+  }
+  const linkTag = () => Array.from(crypto.getRandomValues(new Uint8Array(4)), b => b.toString(16).padStart(2, '0')).join('');
+  const lowMe = () => LINK.tag < LINK.peerTag;   // el «sol 1» del encuentro es el del móvil con la marca menor
+  function linkSend(o) { if (SunLink && LINK.state === 'on') SunLink.send({ data: JSON.stringify(o) }).catch(() => {}); }
+  function linkStartShared(m1, m2) { LINK.shared = { m1, m2 }; LINK.armed = false; LINK.contactT = 0; DUO.setup = true; }
+  function linkBoom() {
+    if (LINK.state !== 'on' || !LINK.peerSun || LINK.shared) return;
+    const me = DUO.mine.total, fr = LINK.peerSun.total, m1 = lowMe() ? me : fr, m2 = lowMe() ? fr : me;
+    linkSend({ t: 'boom', m1, m2 });
+    setTimeout(() => linkStartShared(m1, m2), Math.min(400, LINK.rtt / 2));   // el otro empieza al recibirlo
+  }
+  function linkEvent(ev, d = {}) {
+    if (ev === 'found') { if (LINK.state === 'search') LINK.state = 'found'; }
+    else if (ev === 'connected') {
+      LINK.state = 'on'; LINK.err = '';
+      linkSend({ t: 'hi', v: 1, tag: LINK.tag, pages: books().slice(0, 4000).map(b => parseInt(b.pages, 10) || 0) });
+      linkSend({ t: 'ping', at: performance.now() });
+    } else if (ev === 'disconnected') {
+      Object.assign(LINK, { peerSun: null, peerTag: '', peerN: 0, rs: [], peerRssi: null, dist: null, shared: null });
+      if (LINK.state !== 'off') linkStart();   // vuelve a buscar
+    } else if (ev === 'error') { LINK.err = d.message || 'Error'; }
+    else if (ev === 'rssi') {
+      if (!LINK.peerTag || d.tag !== LINK.peerTag) return;
+      LINK.rs.push(d.rssi); if (LINK.rs.length > 9) LINK.rs.shift();
+      const mine = linkDist(), now = performance.now(); if (now - LINK.sentAt > 300) { LINK.sentAt = now; linkSend({ t: 'd', r: mine }); }
+    } else if (ev === 'message') {
+      let m; try { m = JSON.parse(d.data); } catch { return; }
+      if (m.t === 'hi' && Array.isArray(m.pages)) {
+        LINK.peerTag = String(m.tag || ''); LINK.peerN = m.pages.length;
+        LINK.peerSun = duoMakeSun(m.pages.map(p => ({ pages: p })), 1);
+      } else if (m.t === 'ping') linkSend({ t: 'pong', at: m.at });
+      else if (m.t === 'pong') LINK.rtt = performance.now() - m.at;
+      else if (m.t === 'd') { LINK.peerRssi = m.r; linkDist(); }
+      else if (m.t === 'boom' && !LINK.shared) linkStartShared(m.m1, m.m2);
+    }
+  }
+  async function linkStart() {
+    if (!SunLink) { LINK.state = 'nativo'; return; }
+    try {
+      if (!LINK.subs) LINK.subs = ['found', 'connected', 'disconnected', 'message', 'rssi', 'error'].map(ev => SunLink.addListener(ev, d => linkEvent(ev, d)));
+      const p = await SunLink.ensurePermissions();
+      if (!p.granted) { LINK.state = 'perm'; return; }
+      LINK.tag = linkTag(); LINK.state = 'search';
+      await SunLink.start({ tag: LINK.tag });
+    } catch (e) { LINK.state = 'error'; LINK.err = e.message || String(e); }
+  }
+  function linkStop() {
+    Object.assign(LINK, { state: 'off', peerSun: null, peerTag: '', peerN: 0, rs: [], peerRssi: null, dist: null, shared: null });
+    SunLink?.stop().catch(() => {});
+  }
+  if (!NATIVE) window.__sunlink = linkEvent;   // solo en el navegador, para probar la interfaz sin dos móviles
+
   function buildDuo() {
     const hv = $id('homeView'); if (!hv || $id('duo')) return;
     hv.insertAdjacentHTML('beforeend', `${ib('duoBtn', 'orbit', 'Juntar soles')}
@@ -1422,18 +1494,15 @@
     $id('duoBack').onclick = closeDuo;
     $id('duoProx').onclick = () => setDuoMode('prox');
     $id('duoEnc').onclick = () => setDuoMode('enc');
-    $id('duoAgain').onclick = () => { DUO.setup = true; };
+    $id('duoAgain').onclick = () => { if (DUO.mode === 'prox') linkBoom(); else DUO.setup = true; };
     $id('duoFriend').onchange = e => { DUO.friend = e.target.value; lsSet('duoFriend', DUO.friend); duoBuild(); };
-    // arrastrar: en proximidad mueve el sol del amigo; en colisión, gira el sol que tocas
+    // arrastrar gira un sol: en proximidad el tuyo; en la demo, el que tocas
     const cv = $id('duoCanvas'); let drag = null;
-    cv.addEventListener('pointerdown', e => { cv.setPointerCapture?.(e.pointerId); drag = { x: e.clientX, y: e.clientY, fx: DUO.fx, fy: DUO.fy, t: performance.now(), si: e.clientY < cv.clientHeight / 2 ? 1 : 0 }; });
+    cv.addEventListener('pointerdown', e => { cv.setPointerCapture?.(e.pointerId); drag = { x: e.clientX, y: e.clientY, fx: DUO.fx, fy: DUO.fy, t: performance.now(), si: DUO.mode === 'enc' && e.clientY < cv.clientHeight / 2 ? 1 : 0 }; });
     cv.addEventListener('pointermove', e => {
       if (!drag) return;
-      if (DUO.mode === 'prox') {
-        DUO.fx = Math.max(.08, Math.min(.92, drag.fx + (e.clientX - drag.x) / cv.clientWidth));
-        DUO.fy = Math.max(.08, Math.min(.92, drag.fy + (e.clientY - drag.y) / cv.clientHeight));
-      } else {
-        const S = DUO.suns[drag.si], now = performance.now(), dt = Math.max(8, now - drag.t) / 1000, k = .8 / Math.min(cv.clientWidth, cv.clientHeight);
+      {
+        const S = drag.si ? DUO.suns[1] : DUO.mine, now = performance.now(), dt = Math.max(8, now - drag.t) / 1000, k = .8 / Math.min(cv.clientWidth, cv.clientHeight);
         const dx = (e.clientX - drag.x) * k, dy = (e.clientY - drag.y) * k;
         S.M = rotY(dx, rotX(dy, S.M)); S.rot.vx = S.rot.vx * .4 + dy / dt * .6; S.rot.vy = S.rot.vy * .4 + dx / dt * .6;
         drag.x = e.clientX; drag.y = e.clientY; drag.t = now;
@@ -1446,8 +1515,9 @@
     DUO.mode = m; lsSet('duoMode', m); DUO.setup = true;
     $id('duoProx').classList.toggle('on', m === 'prox'); $id('duoEnc').classList.toggle('on', m === 'enc');
     $id('duoAgain').hidden = m !== 'enc';
-    $id('duoHint').textContent = m === 'prox' ? 'Arrastra el sol del amigo hacia el tuyo' : 'Arrastra un sol para girarlo';
-    if (m === 'prox') { DUO.fx = .5; DUO.fy = .27; }
+    $id('duoFriend').hidden = m !== 'enc';
+    $id('duoHint').textContent = m === 'prox' ? '' : 'Demostración con un amigo simulado · arrastra un sol para girarlo';
+    if (m === 'prox') linkStart(); else linkStop();
   }
   function openDuo() {
     stopSun(); $id('duo').hidden = false; $id('sunCfgBtn').hidden = true; $id('duoBtn').hidden = true;
@@ -1455,7 +1525,7 @@
     setDuoMode(DUO.mode); startDuo();
   }
   function closeDuo() {
-    stopDuo(); $id('duo').hidden = true; $id('sunCfgBtn').hidden = false; $id('duoBtn').hidden = false; startSun();
+    stopDuo(); linkStop(); $id('duo').hidden = true; $id('sunCfgBtn').hidden = false; $id('duoBtn').hidden = false; startSun();
   }
   const rotX = (a, m) => { const c = Math.cos(a), s = Math.sin(a); return [m[0], m[1], m[2], c * m[3] - s * m[6], c * m[4] - s * m[7], c * m[5] - s * m[8], s * m[3] + c * m[6], s * m[4] + c * m[7], s * m[5] + c * m[8]]; };
   const rotY = (a, m) => { const c = Math.cos(a), s = Math.sin(a); return [c * m[0] + s * m[6], c * m[1] + s * m[7], c * m[2] + s * m[8], m[3], m[4], m[5], -s * m[0] + c * m[6], -s * m[1] + c * m[7], -s * m[2] + c * m[8]]; };
@@ -1475,39 +1545,62 @@
       if (!DUO.on) return;
       const P = DUO_P, dt = Math.min(.05, (now - last) / 1000); last = now; const T = now / 1000;
       const R = Math.min(W, H) * .2, pxPerCm = W / 7;          // una pantalla ≈ 7 cm de ancho
-      const A = [W / 2, H * .72], B = DUO.mode === 'prox' ? [DUO.fx * W, DUO.fy * H] : [W / 2, H * .28];
-      const vx0 = B[0] - A[0], vy0 = B[1] - A[1], cd = Math.hypot(vx0, vy0) || 1, ux = vx0 / cd, uy = vy0 / cd;
-      const st = [{}, {}];
-      let hudTxt = '';
-      if (DUO.mode === 'prox') {
-        const gapCm = Math.max(0, cd - 2 * R) / pxPerCm;
-        DUO.distS += (gapCm - DUO.distS) * (1 - Math.exp(-dt / P.damp));
-        const K = 1 - smoothstep(P.near, P.far, DUO.distS), C = 1 - smoothstep(P.contact * .5, P.contact * 1.6 + .2, DUO.distS);
-        for (let si = 0; si < 2; si++) {
-          const dir = si ? -1 : 1, pull = dir * (P.pull * K - P.repel * C) * R * .9, H0 = si ? B : A;
-          st[si] = { cx: H0[0] + ux * pull, cy: H0[1] + uy * pull, d: [dir * ux, dir * uy], K, C, spin: dir };
+      const prox = DUO.mode === 'prox', HOME = 2.2 * R;          // en proximidad, tu sol a 2,2 R del borde de arriba
+      let A, B, suns, st = [{}, {}], hudTxt = '', hint = '', enc = !prox, encA, encB, swap = false;
+      if (prox) {
+        const peer = LINK.state === 'on' ? LINK.peerSun : null;
+        suns = peer ? [DUO.mine, peer] : [DUO.mine];
+        DUO.distS += ((LINK.dist ?? 12) - DUO.distS) * (1 - Math.exp(-dt / P.damp));
+        A = [W / 2, HOME]; B = [W / 2, -HOME - DUO.distS * pxPerCm];    // el sol del amigo, al otro lado del borde superior
+        if (LINK.shared && peer) {                                   // colisión entre las dos pantallas, juntas por arriba
+          enc = true; swap = !lowMe();
+          encA = swap ? [W / 2, -HOME] : [W / 2, HOME]; encB = swap ? [W / 2, HOME] : [W / 2, -HOME];
+        } else if (peer) {
+          const K = 1 - smoothstep(P.near, P.far, DUO.distS), C = 1 - smoothstep(P.contact * .5, P.contact * 1.6 + .2, DUO.distS);
+          for (let si = 0; si < 2; si++) {
+            const dir = si ? -1 : 1, pull = dir * (P.pull * K - P.repel * C) * R * .9, H0 = si ? B : A;
+            st[si] = { cx: H0[0], cy: H0[1] - pull, d: [0, -dir], K, C, spin: dir };
+          }
+          if (DUO.distS < P.contact) { LINK.contactT += dt; if (LINK.armed && LINK.contactT > 1.2 && lowMe()) linkBoom(); }
+          else { LINK.contactT = 0; if (DUO.distS > P.contact * 3) LINK.armed = true; }
+          hudTxt = `${LINK.dist == null ? '¿? cm' : DUO.distS.toFixed(1) + ' cm'} · ${C > .5 ? 'contacto' : K > .5 ? 'cerca' : K > .02 ? 'se notan' : 'lejos'}`;
+          hint = `Sol de ${LINK.peerN} libros conectado · juntad los móviles por la parte de arriba`;
+        } else {
+          st[0] = { cx: A[0], cy: A[1], d: [0, -1], K: 0, C: 0, spin: 1 };
+          const S = LINK.state;
+          hudTxt = S === 'nativo' ? 'Solo en la app de Android' : S === 'perm' ? 'Sin permiso de dispositivos cercanos' : S === 'error' ? 'No se pudo buscar'
+            : S === 'on' ? 'Conectado · recibiendo su sol…' : S === 'found' ? 'Sol encontrado · conectando…' : 'Buscando otro sol cerca' + '.'.repeat(1 + (T | 0) % 3);
+          hint = S === 'perm' ? 'Permite «Dispositivos cercanos» y vuelve a entrar' : S === 'error' ? LINK.err
+            : 'Pide a tu amigo que abra Juntar soles → Proximidad';
+          if (LINK.err && S !== 'error') hint = LINK.err;
         }
-        hudTxt = `${DUO.distS.toFixed(1)} cm · ${C > .5 ? 'contacto' : K > .5 ? 'cerca' : K > .02 ? 'se notan' : 'lejos'}`;
+        $id('duoAgain').hidden = !peer || !!LINK.shared;
       } else {
-        const rStart = cd / R;
-        if (DUO.setup) { duoEncSetup(rStart); DUO.setup = false; }
+        suns = DUO.suns; A = [W / 2, H * .72]; B = [W / 2, H * .28]; encA = A; encB = B;
+      }
+      if (enc) {
+        const vx0 = encB[0] - encA[0], vy0 = encB[1] - encA[1], cd = Math.hypot(vx0, vy0) || 1, ux = vx0 / cd, uy = vy0 / cd;
+        const rStart = cd / R, sh = prox ? LINK.shared : null;
+        if (DUO.setup) { sh ? duoEncSetup(rStart, sh.m1, sh.m2) : duoEncSetup(rStart); DUO.setup = false; }
         duoEncStep(dt, rStart);
         const E = DUO.enc, rel = E.rel || [rStart, 0], psi = Math.atan2(uy, ux), Mt = E.M1 + E.M2;
         const qx = rel[0] * Math.cos(psi) + rel[1] * Math.sin(psi), qy = rel[0] * Math.sin(psi) - rel[1] * Math.cos(psi);
-        const bx = (E.M1 * A[0] + E.M2 * B[0]) / Mt, by = (E.M1 * A[1] + E.M2 * B[1]) / Mt;
+        const bx = (E.M1 * encA[0] + E.M2 * encB[0]) / Mt, by = (E.M1 * encA[1] + E.M2 * encB[1]) / Mt;
         const c = [[bx - qx * R * E.M2 / Mt, by - qy * R * E.M2 / Mt], [bx + qx * R * E.M1 / Mt, by + qy * R * E.M1 / Mt]];
         const dist = Math.hypot(qx, qy), dx = qx / (dist || 1), dy = qy / (dist || 1), contact = 1 - smoothstep(E.eps * .35, E.eps * 1.3, dist);
         for (let si = 0; si < 2; si++) {
           const K = Math.min(1.4, E.acc[si] * P.tidal + (1 - smoothstep(E.eps * .8, E.eps * 3.5, dist)) * .35);
-          st[si] = { cx: c[si][0], cy: c[si][1], d: si ? [-dx, -dy] : [dx, dy], K, C: contact, spin: si ? -1 : 1, merge: E.merged };
+          st[swap ? 1 - si : si] = { cx: c[si][0], cy: c[si][1], d: si ? [-dx, -dy] : [dx, dy], K, C: contact, spin: si ? -1 : 1, merge: E.merged };
         }
         hudTxt = E.bound ? `fusión ${Math.round(E.merged * 100)} % · ξ ${xiType(E.xi[0])}` : `desviación ${(E.phi * 180 / Math.PI).toFixed(1)}° · marea ${xiType(E.xi[0])} / ${xiType(E.xi[1])}`;
+        if (prox) hint = '¡Colisión!';
       }
-      st[0].ox = st[1].cx; st[0].oy = st[1].cy; st[1].ox = st[0].cx; st[1].oy = st[0].cy;
+      if (suns.length > 1) { st[0].ox = st[1].cx; st[0].oy = st[1].cy; st[1].ox = st[0].cx; st[1].oy = st[0].cy; }
       $id('duoHud').textContent = hudTxt;
+      if (prox && $id('duoHint').textContent !== hint) $id('duoHint').textContent = hint;
       px.fill(0);
-      for (let si = 0; si < 2; si++) {
-        const S = DUO.suns[si], o = st[si], K = o.K, C = o.C, Rs = R * (1 + P.grow * Math.min(1, K)) * (1 - .25 * (o.merge || 0));
+      for (let si = 0; si < suns.length; si++) {
+        const S = suns[si], o = st[si], K = o.K, C = o.C, Rs = R * (1 + P.grow * Math.min(1, K)) * (1 - .25 * (o.merge || 0));
         const dwx = o.d[0], dwy = -o.d[1], m0 = S.rot;
         if (!m0.drag) { const f = 1 - Math.exp(-dt * SP.inertia), base = .08 * (1 + P.spinUp * Math.min(1, K)) * o.spin; m0.vx += -m0.vx * f; m0.vy += (base - m0.vy) * f; S.M = rotY(m0.vy * dt, rotX(m0.vx * dt, S.M)); }
         for (const wl of S.wells) { wl.u = norm3(rotAxis(wl.u, wl.axis, wl.spin * SP.drift * dt)); wl.b = basis(wl.u); }
@@ -1549,7 +1642,7 @@
       if (DUO.glow) { ctx.globalAlpha = SP.glowAlpha; ctx.filter = `blur(${Math.round(SP.glowBlur * scale)}px)`; ctx.drawImage(buf, 0, 0); }
       ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.drawImage(buf, 0, 0);
       if (dt > .034) slow++; else slow = Math.max(0, slow - 1);
-      if (slow > 90) { const S0 = DUO.suns; if (S0[0].n > 4000) S0.forEach(S => { S.n = Math.round(S.n * .7); }); else DUO.glow = false; slow = 0; }
+      if (slow > 90) { if (suns[0].n > 4000) suns.forEach(S => { S.n = Math.round(S.n * .7); }); else DUO.glow = false; slow = 0; }
       DUO.raf = requestAnimationFrame(frame);
     };
     DUO.raf = requestAnimationFrame(frame);
