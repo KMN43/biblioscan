@@ -15,6 +15,7 @@
   --you: #121212;        /* «mis páginas» */
   --glass: rgba(236, 235, 230, .5);
   --line: rgba(18, 18, 18, .22);
+  --onink: #fff4e1;
   --display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
   color-scheme: light;
@@ -25,69 +26,56 @@ html, body { height: 100%; margin: 0; }
 body { background: var(--sky); color: var(--ink); font-family: var(--mono); overflow: hidden; }
 #sky { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
 #sky.drag { cursor: grabbing; }
-.top { position: fixed; left: 0; right: 0; top: 0; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;
-  padding-top: calc(14px + env(safe-area-inset-top, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); pointer-events: none; }
-.top > * { pointer-events: auto; }
-h1 { font-family: var(--display); font-weight: 500; font-size: 24px; letter-spacing: -.01em; margin: 0; line-height: 1.05; text-wrap: balance; }
-.sub { margin: 4px 0 0; font-size: 11px; color: var(--muted); letter-spacing: .04em; }
-.stats { display: flex; gap: 18px; font-variant-numeric: tabular-nums; text-align: right; }
-.stats b { display: block; font-family: var(--display); font-size: 19px; font-weight: 500; }
-.stats small { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; }
 .bottom { position: fixed; left: 0; right: 0; bottom: 0; padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
 .bottom > * { pointer-events: auto; }
-.bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--glass); border: 1px solid var(--line); border-radius: 22px; padding: 8px 10px; backdrop-filter: blur(8px); max-width: 760px; width: 100%; margin: 0 auto; box-sizing: border-box; }
-.row { display: flex; align-items: center; gap: 10px; flex: 1 1 280px; min-width: 0; }
+.bar { display: flex; align-items: center; gap: 10px; background: var(--glass); border: 1px solid var(--line); border-radius: 999px; padding: 6px; backdrop-filter: blur(8px); max-width: 520px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+.ico { width: 38px; height: 38px; padding: 0; display: grid; place-items: center; flex: none; font-size: 13px; letter-spacing: 0; }
+.ico svg { width: 18px; height: 18px; fill: currentColor; }
+.msg { position: fixed; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; color: var(--muted); font-size: 12px; pointer-events: none; }
+.phys .x { position: absolute; top: 8px; right: 8px; border: none; padding: 4px 8px; }
+.phys { position: fixed; }
 button { font: 600 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; cursor: pointer; white-space: nowrap; }
 button:hover { border-color: var(--ink); }
 button[aria-pressed="true"] { border-color: var(--you); color: var(--you); }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-button.pri { background: var(--ink); border-color: var(--ink); color: #fff4e1; }
-button[aria-pressed="true"] { background: var(--ink); color: #fff4e1; }
+button.pri { background: var(--ink); border-color: var(--ink); color: var(--onink); }
+button[aria-pressed="true"] { background: var(--you); border-color: var(--you); color: var(--onink); }
 input[type=range] { flex: 1; min-width: 0; accent-color: var(--ink); }
-#date { font-variant-numeric: tabular-nums; font-size: 12px; min-width: 7.5em; text-align: right; }
+#date { font-variant-numeric: tabular-nums; font-size: 11px; white-space: nowrap; padding-right: 6px; }
 .hint { text-align: center; font-size: 10px; color: var(--muted); letter-spacing: .08em; }
-.phys { position: fixed; left: max(16px, env(safe-area-inset-left, 0px)); top: calc(88px + env(safe-area-inset-top, 0px)); width: min(330px, calc(100% - 32px)); background: var(--glass); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; backdrop-filter: blur(8px); box-sizing: border-box; font-size: 11.5px; line-height: 1.55; max-height: calc(100% - 230px); overflow: auto; }
+.phys { position: fixed; left: max(16px, env(safe-area-inset-left, 0px)); top: calc(16px + env(safe-area-inset-top, 0px)); width: min(330px, calc(100% - 32px)); background: var(--glass); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; backdrop-filter: blur(8px); box-sizing: border-box; font-size: 11.5px; line-height: 1.55; max-height: calc(100% - 230px); overflow: auto; }
 .phys h2 { font-family: var(--display); font-weight: 500; font-size: 16px; margin: 0 0 8px; }
 .phys p { margin: 0 0 8px; color: var(--ink); }
 .phys code { font-family: var(--mono); color: var(--ink); }
 .phys dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 8px 0 0; font-variant-numeric: tabular-nums; }
 .phys dt { color: var(--muted); } .phys dd { margin: 0; text-align: right; }
-.inapp .top { padding-left: calc(70px + env(safe-area-inset-left, 0px)); }
+.inapp .bottom { padding-right: calc(76px + env(safe-area-inset-right, 0px)); }
+.inapp #info { display: none; }
 .nogl { position: fixed; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; color: var(--muted); }
-@media (max-width: 560px) { .stats { gap: 12px; } .stats b { font-size: 15px; } h1 { font-size: 20px; } .phys { top: auto; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); max-height: 45%; } }
+@media (max-width: 560px) { .phys { top: auto; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); max-height: 60%; } }
 </style>
 </head>
 <body>
 
 <canvas id="sky" aria-label="Galaxia en la que cada estrella es una página y cada libro una estrella grande"></canvas>
-<header class="top">
-  <div><h1>Galaxia BiblioScan</h1><p class="sub"><span id="scale">Cargando la galaxia…</span></p></div>
-  <div class="stats" aria-live="polite">
-    <div><b id="sReaders">0</b><small>lectores</small></div>
-    <div><b id="sBooks">0</b><small>libros</small></div>
-    <div><b id="sPages">0</b><small>páginas</small></div>
-  </div>
-</header>
+<div class="msg" id="msg">Cargando la galaxia…</div>
 <aside class="phys" id="phys" hidden>
-  <h2>Cómo se mueve</h2>
-  <p>Cada <b>página</b> es una estrella y cada <b>libro</b> es una estrella grande. Al añadirlo estalla como una supernova y sus páginas se reparten a su alrededor. La rotación diferencial las estira después en corrientes.</p>
-  <p>Los dos brazos siguen una espiral logarítmica, <code>θ = θ₀ + ln R / tan i</code>, con una inclinación de brazo <code>i = 14°</code>, y giran juntos alrededor de un núcleo redondo.</p>
-  <p>La galaxia crece de dentro hacia fuera: los primeros lectores forman el núcleo y los nuevos alargan los brazos.</p>
+  <button class="x" id="physX" type="button" aria-label="Cerrar">✕</button>
+  <h2>Galaxia de lectores</h2>
+  <dl><dt>Lectores</dt><dd id="sReaders">0</dd><dt>Libros</dt><dd id="sBooks">0</dd><dt>Páginas</dt><dd id="sPages">0</dd><dt>Escala</dt><dd id="scale">—</dd></dl>
+  <p style="margin-top:10px">Cada <b>página</b> es una estrella y cada <b>libro</b>, una estrella grande que estalla como una supernova al añadirse. Sus páginas se reparten en un cúmulo que la rotación estira.</p>
+  <p>Dos brazos en espiral logarítmica, <code>θ = θ₀ + ln R / tan 14°</code>, alrededor de un núcleo redondo. Crece de dentro afuera: los primeros lectores forman el núcleo y los nuevos alargan los brazos.</p>
 </aside>
 <footer class="bottom">
   <div class="bar">
-    <div class="row">
-      <button id="play" class="pri" type="button">▶ Formación</button>
-      <input id="time" type="range" min="0" max="1000" value="1000" aria-label="Fecha de la galaxia">
-      <span id="date"></span>
-    </div>
-    <div class="row" style="flex: 0 1 auto">
-      <button id="me" type="button" aria-pressed="false" hidden>Mis páginas</button>
-      <button id="info" type="button" aria-pressed="false">Física</button>
-    </div>
+    <button id="play" class="ico pri" type="button" aria-label="Reproducir la formación">▶</button>
+    <input id="time" type="range" min="0" max="1000" value="1000" aria-label="Fecha de la galaxia">
+    <span id="date"></span>
+    <button id="me" class="ico" type="button" aria-pressed="false" aria-label="Resaltar mis páginas" title="Mis páginas" hidden><svg viewBox="0 0 24 24"><path d="M12 2.8Q13 11 21.2 12Q13 13 12 21.2Q11 13 2.8 12Q11 11 12 2.8Z"/></svg></button>
+    <button id="info" class="ico" type="button" aria-pressed="false" aria-label="Información" title="Información">i</button>
   </div>
-  </footer>
+</footer>
 
 <script>
 (async () => {
@@ -101,7 +89,7 @@ input[type=range] { flex: 1; min-width: 0; accent-color: var(--ink); }
   let R = mulberry(1);
   const gauss = () => Math.sqrt(-2 * Math.log(R() + 1e-9)) * Math.cos(2 * Math.PI * R());
   const DAY = 864e5;
-  const say = t => { document.getElementById('scale').textContent = t; };
+  const say = t => { const m = document.getElementById('msg'); m.textContent = t; m.hidden = !t; };
   const fmt = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
   const num = new Intl.NumberFormat('es-ES');
 
@@ -111,6 +99,11 @@ input[type=range] { flex: 1; min-width: 0; accent-color: var(--ink); }
     pitch: 14, armWidth: .22, coreSpread: 5, interarm: .08, rings: 48, diskScale: 4.3, bar: .2, barFlat: 0,
     thick: .3, flare: 3.3, warp: 4, spin: .045, coreSpin: .65, autoRotate: 0,
     pageSize: 2, pageGlow: 1, bookSize: 3, bookGlow: 1, nova: 23.5, burst: 2, adaptive: true, camTilt: .48, camDist: .7835 };
+  const THEME = { sol: {}, noche: { bg: '#121212', star: '#ffb08a', book: '#fff4e1', me: '#ff4f12', additive: true,
+      ui: { sky: '#121212', ink: '#ecebe6', muted: 'rgba(236,235,230,.6)', glass: 'rgba(30,30,30,.62)', line: 'rgba(236,235,230,.18)', you: '#ff4f12', onink: '#121212' } },
+    papel: { bg: '#ecebe6', star: '#121212', book: '#121212', me: '#ff4f12', additive: false,
+      ui: { sky: '#ecebe6', ink: '#121212', muted: 'rgba(18,18,18,.6)', glass: 'rgba(255,255,255,.6)', line: 'rgba(18,18,18,.18)', you: '#ff4f12', onink: '#ecebe6' } } }[new URLSearchParams(location.search).get('theme')] || {};
+  Object.assign(CFG, THEME); if (THEME.ui) for (const [k, v] of Object.entries(THEME.ui)) document.documentElement.style.setProperty('--' + k, v);
   const DYN = { pitch: CFG.pitch, Op: CFG.spin, eBar: CFG.barFlat, Rbar: CFG.bar, Rmax: 30, h0: CFG.thick, flare: CFG.flare, warp: CFG.warp, Rwarp: 20 };
 
   // ---------- los soles de la galaxia: solo números (páginas de cada libro y cuándo se añadió) ----------
@@ -130,7 +123,7 @@ input[type=range] { flex: 1; min-width: 0; accent-color: var(--ink); }
   const totalPages = readers.reduce((a, r) => a + r.books.reduce((s, b) => s + b.pages, 0), 0);
   const mobile = Math.min(innerWidth, innerHeight) < 700 || /Android|iPhone|iPad/i.test(navigator.userAgent);
   const CAP = mobile ? 380000 : 1200000, PER = Math.max(1, Math.ceil(totalPages / CAP));
-  say((PER === 1 ? '1 estrella = 1 página' : `1 estrella = ${PER} páginas`) + ' · cada libro, una estrella grande');
+  say(''); document.getElementById('scale').textContent = PER === 1 ? '1 estrella = 1 página' : `1 estrella = ${PER} páginas`;
 
   // ---------- partículas: libros (estrellas grandes) y sus páginas (cúmulo alrededor) ----------
   // a0 = (R del libro, fase del libro, dR, dfase)   a1 = (z gauss, día en que aparece, tamaño, banderas: 1 libro, 2 mío)
@@ -252,13 +245,14 @@ input[type=range] { flex: 1; min-width: 0; accent-color: var(--ink); }
   // ---------- controles ----------
   const timeEl = document.getElementById('time'), dateEl = document.getElementById('date'), playBtn = document.getElementById('play');
   let day = DAYS, playing = false, me = false;
-  const setPlay = () => { playBtn.textContent = playing ? '❚❚ Pausa' : '▶ Formación'; };
+  const setPlay = () => { playBtn.textContent = playing ? '❚❚' : '▶'; playBtn.setAttribute('aria-label', playing ? 'Pausar' : 'Reproducir la formación'); };
   timeEl.addEventListener('input', () => { playing = false; setPlay(); day = DAYS * timeEl.value / 1000; });
   playBtn.onclick = () => { playing = !playing; if (playing && day >= DAYS - .01) day = 0; setPlay(); };
   const meBtn = document.getElementById('me');
   meBtn.onclick = () => { me = !me; meBtn.setAttribute('aria-pressed', me); };
   const infoBtn = document.getElementById('info'), phys = document.getElementById('phys');
   infoBtn.onclick = () => { phys.hidden = !phys.hidden; infoBtn.setAttribute('aria-pressed', !phys.hidden); };
+  document.getElementById('physX').onclick = () => { phys.hidden = true; infoBtn.setAttribute('aria-pressed', false); };
 
   function stats() {
     let rd = 0, bk = 0, pg = 0; for (const e of events) { if (e[0] > day) break; rd += e[3]; bk += e[1]; pg += e[2]; }

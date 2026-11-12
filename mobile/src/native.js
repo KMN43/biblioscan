@@ -362,7 +362,8 @@
     inbox: '<path d="M4 13.5l2.2-8h11.6l2.2 8V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M4 13.5h4.5l1 2.5h5l1-2.5H20"/>',
     qr: '<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2zM18 14h2M14 18h2M18 18h2v2h-2z"/>',
     share: '<circle cx="17.5" cy="6" r="2.5"/><circle cx="6.5" cy="12" r="2.5"/><circle cx="17.5" cy="18" r="2.5"/><path d="M8.7 10.8l6.6-3.6M8.7 13.2l6.6 3.6"/>',
-    home: '<path d="M4 11.2L12 4.5l8 6.7V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/>',
+    home: '<path d="M12 2.8Q13 11 21.2 12Q13 13 12 21.2Q11 13 2.8 12Q11 11 12 2.8Z"/>',
+    galaxy: '<path d="M12 12c1.4-1.5 4-.6 4 1.6 0 2.9-3.6 4.4-6.4 3.1-3.6-1.7-3.8-6.6-.9-9.1 3.7-3.1 9.4-1.6 11 2.6"/><path d="M12 12c-1.4 1.5-4 .6-4-1.6 0-2.9 3.6-4.4 6.4-3.1 3.6 1.7 3.8 6.6.9 9.1-3.7 3.1-9.4 1.6-11-2.6"/>',
     info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><circle cx="12" cy="7.9" r=".6" fill="currentColor"/>',
     ext: '<path d="M14 4.5h5.5V10M19.5 4.5L11 13M17 14v5.5H4.5V7H10"/>',
   };
@@ -1315,8 +1316,7 @@
     ['glowAlpha', 'Resplandor', 0, 1, .01, v => `${Math.round(v * 100)} %`],
   ];
   function buildSunConfig() {
-    const hv = $id('homeView'); if (!hv || $id('sunCfgBtn')) return;
-    hv.insertAdjacentHTML('beforeend', `${ib('sunCfgBtn', 'sliders', 'Personalizar')}`);
+    const hv = $id('homeView'); if (!hv || $id('sunCfg')) return;
     document.body.insertAdjacentHTML('beforeend', `
       <div id="sunCfg" class="msheet sunsheet" hidden><div class="msin">
         <div class="msh"><b>Personalizar</b><span class="mono-caps">Se guarda en este móvil</span></div>
@@ -1330,7 +1330,7 @@
     const paint = () => {
       SUN_UI.forEach(([k, , , , , fmtv]) => { $id('sc_' + k).value = SP[k]; $id('so_' + k).textContent = fmtv(+SP[k]); });
       sheet.querySelectorAll('.sth').forEach(b => b.classList.toggle('on', THEMES[b.dataset.theme].bgColor === SP.bgColor && THEMES[b.dataset.theme].ptColor === SP.ptColor));
-      $id('homeView').style.background = SP.bgColor;
+      $id('homeView').style.background = SP.bgColor; homeChrome();
     };
     let rbT = 0;
     const apply = k => {
@@ -1343,7 +1343,7 @@
     const close = () => { sheet.hidden = true; };
     $id('sunCfgOk').onclick = close;
     sheet.addEventListener('click', e => { if (e.target === sheet) close(); });
-    $id('sunCfgBtn').onclick = () => { paint(); sheet.hidden = false; };
+    HOME.openSunCfg = () => { paint(); sheet.hidden = false; };
   }
 
   // ============================================================ GALAXIA BIBLIOSCAN (comunidad)
@@ -1401,26 +1401,18 @@
     msg.textContent = typeof note === 'string' && note.length > 12 ? note : on ? `Tu sol está en la galaxia · actualizado ${at ? ago(at) : '—'}` : 'Tu sol no está en la galaxia';
     $id('galJoin').hidden = on; $id('galLeave').hidden = !on;
   }
-  function galFrameUrl() { const me = galOn() ? galIdentity(false) : null; return `${GALAXY_URL}/?app=1${me ? '&me=' + me.id : ''}`; }
+  function galFrameUrl() { const me = galOn() ? galIdentity(false) : null; return `${GALAXY_URL}/?app=1&theme=${galTheme()}${me ? '&me=' + me.id : ''}`; }
   function openGalaxy() {
     if (!$id('galView')) return;
     stopSun(); GALX.open = true;
     $id('galFrame').src = galFrameUrl();
-    $id('galView').hidden = false; $id('galBtn').hidden = true; $id('sunCfgBtn').hidden = true;
+    $id('galView').hidden = false; setIcon($id('hSwitch'), 'home', 'Volver a mi sol'); homeChrome();
   }
   function closeGalaxy() {
     if (!$id('galView') || $id('galView').hidden) return;
     GALX.open = false; $id('galView').hidden = true; $id('galFrame').src = 'about:blank';
-    $id('galBtn').hidden = false; $id('sunCfgBtn').hidden = false;
+    setIcon($id('hSwitch'), 'galaxy', 'Ver la galaxia de lectores'); homeChrome();
     if (homeOn) startSun();
-  }
-  function buildGalaxy() {
-    const hv = $id('homeView'); if (!hv || $id('galBtn')) return;
-    hv.insertAdjacentHTML('beforeend', `${ib('galBtn', 'star', 'Galaxia de lectores')}
-      <div id="galView" class="galv" hidden><iframe id="galFrame" title="Galaxia BiblioScan" src="about:blank"></iframe>${ib('galBack', 'prev', 'Volver a mi sol')}</div>`);
-    $id('galBtn').onclick = openGalaxy;
-    $id('galBack').onclick = closeGalaxy;
-    ['tabScan', 'tabCat', 'tabLib'].forEach(id => $id(id)?.addEventListener('click', closeGalaxy));
   }
   // sección de Info
   function hookGalaxyInfo() {
@@ -1437,8 +1429,107 @@
       delete $id('galLeave').dataset.sure;
       run(async () => { await galLeave(); galInfo(); mtoast('Tu sol ya no está en la galaxia'); }, 'Quitando tu sol…');
     };
-    $id('galSee').onclick = () => { $id('dataClose').click(); if (isPhone()) { showHome(); openGalaxy(); } else window.open(galFrameUrl(), '_blank'); };
+    $id('galSee').onclick = () => { $id('dataClose').click(); if (isPhone()) { showHome(); openGalaxy(); } else window.open(galFrameUrl().replace('app=1&', ''), '_blank'); };
     $id('tabData').addEventListener('click', () => ready.then(galInfo));
+  }
+
+  // ============================================================ HOME: barra con los colores del modo, botones apilados e info
+  const HOME = { openSunCfg: null };
+  const GAL_THEMES = {
+    sol:   { label: 'Sol',   bg: '#ff4f12', ink: '#121212', pt: '#fff4e1' },
+    noche: { label: 'Noche', bg: '#121212', ink: '#ffb08a', pt: '#ffb08a' },
+    papel: { label: 'Papel', bg: '#ecebe6', ink: '#121212', pt: '#121212' },
+  };
+  const galTheme = () => { const t = lsGet('galTheme', 'sol'); return GAL_THEMES[t] ? t : 'sol'; };
+  const lum = h => { const [r, g, b] = hexRgb(h); return (.2126 * r + .7152 * g + .0722 * b) / 255; };
+  const nfES = new Intl.NumberFormat('es-ES');
+  // en Home, la barra inferior y los botones toman los colores del modo visible (sol o galaxia); fuera de Home, naranja
+  function homeChrome() {
+    const side = document.querySelector('.side'), hv = $id('homeView'); if (!side || !hv) return;
+    if (!homeOn) { side.style.removeProperty('--navbg'); side.style.removeProperty('--navink'); return; }
+    let bg, ink;
+    if (GALX.open) { const t = GAL_THEMES[galTheme()]; bg = t.bg; ink = t.ink; }
+    else { bg = SP.bgColor; ink = lum(bg) < .35 ? SP.ptColor : '#121212'; }
+    side.style.setProperty('--navbg', bg); side.style.setProperty('--navink', ink);
+    hv.style.setProperty('--hbg', bg); hv.style.setProperty('--hink', ink);
+  }
+  function setIcon(btn, name, label) { btn.innerHTML = svg(name); btn.setAttribute('aria-label', label); btn.title = label; }
+  const kpi = (v, l) => `<div><b>${nfES.format(Math.round(v))}</b><span class="mono-caps">${l}</span></div>`;
+
+  function buildHomeUI() {
+    const hv = $id('homeView'); if (!hv || $id('hstack')) return;
+    hv.insertAdjacentHTML('beforeend', `
+      <div id="galView" class="galv" hidden><iframe id="galFrame" title="Galaxia de lectores" src="about:blank"></iframe></div>
+      <div id="hstack" class="hstack">${ib('hSwitch', 'galaxy', 'Ver la galaxia de lectores')}${ib('hCfg', 'sliders', 'Ajustes')}${ib('hInfo', 'info', 'Información')}</div>`);
+    document.body.insertAdjacentHTML('beforeend', `
+      <div id="galCfg" class="msheet sunsheet" hidden><div class="msin">
+        <div class="msh"><b>Galaxia</b><span class="mono-caps">Tema · se guarda en este móvil</span></div>
+        <div class="sthemes">${Object.entries(GAL_THEMES).map(([k, t]) => `<button class="sth" data-gt="${k}" aria-label="Tema ${t.label}" title="${t.label}" style="--a:${t.bg};--b:${t.pt}"></button>`).join('')}</div>
+        <p class="hint mono-caps">Para ver la galaxia necesitas haberte unido: Info → Galaxia de lectores.</p>
+        <div class="msb"><span class="grow"></span>${ib('galCfgOk', 'check', 'Listo')}</div>
+      </div></div>
+      <div id="homeInfo" class="msheet sunsheet" hidden><div class="msin"><div id="homeInfoBody"></div>
+        <div class="msb"><span class="grow"></span>${ib('homeInfoOk', 'check', 'Cerrar')}</div></div></div>`);
+    const gc = $id('galCfg'), hi = $id('homeInfo');
+    const paintGal = () => gc.querySelectorAll('.sth').forEach(b => b.classList.toggle('on', b.dataset.gt === galTheme()));
+    gc.querySelectorAll('.sth').forEach(b => b.onclick = () => { lsSet('galTheme', b.dataset.gt); paintGal(); if (GALX.open) $id('galFrame').src = galFrameUrl(); homeChrome(); });
+    $id('galCfgOk').onclick = () => { gc.hidden = true; };
+    gc.addEventListener('click', e => { if (e.target === gc) gc.hidden = true; });
+    $id('homeInfoOk').onclick = () => { hi.hidden = true; };
+    hi.addEventListener('click', e => { if (e.target === hi) hi.hidden = true; });
+    $id('hSwitch').onclick = () => { GALX.open ? closeGalaxy() : openGalaxy(); };
+    $id('hCfg').onclick = () => { if (GALX.open) { paintGal(); gc.hidden = false; } else HOME.openSunCfg?.(); };
+    $id('hInfo').onclick = () => { hi.hidden = false; GALX.open ? galInfoFill() : ($id('homeInfoBody').innerHTML = sunInfoHtml()); hi.querySelector('.msin').scrollTop = 0; };
+    ['tabScan', 'tabCat', 'tabLib'].forEach(id => $id(id)?.addEventListener('click', closeGalaxy));
+  }
+
+  function sunInfoHtml() {
+    const list = books(), S = SUN.S;
+    const pages = list.reduce((a, b) => a + (parseInt(b.pages, 10) || 0), 0), missing = list.filter(b => !(parseInt(b.pages, 10) > 0)).length;
+    return `<div class="msh"><b>Tu sol</b><span class="mono-caps">Cómo funciona</span></div>
+      <div class="kpis">${kpi(list.length, 'libros')}${kpi(pages, 'páginas')}${kpi(S ? S.n : 0, 'puntos')}${kpi(S ? S.links.length : 0, 'arcos')}</div>
+      ${missing ? `<p class="hint mono-caps">${missing} libros sin número de páginas cuentan como 200</p>` : ''}
+      <div class="iex">
+        <p><b>Una semilla fija.</b> El número de libros y de páginas forman una semilla (<code>FNV-1a("libros:páginas")</code>) que alimenta un generador pseudoaleatorio (Mulberry32). La misma biblioteca da siempre el mismo sol.</p>
+        <p><b>Los libros son nodos.</b> Cada libro es un pozo de gravedad invisible en un punto al azar de la esfera, con masa <code>m = páginas del libro / páginas totales</code>. Los libros vecinos se unen con enlaces.</p>
+        <p><b>Las páginas son el plasma.</b> Cada punto es una página. La mayoría granula alrededor de su libro, a una distancia <code>r ≤ ${SP.spreadBase} + ${SP.spreadMass}·√m</code>, y gira como un remolino más rápido cuanto más cerca (<code>ω ∝ 1/r</code>). Un ${Math.round(SP.promFrac * 100)} % viaja en arcos de un libro a otro, por el camino más corto sobre la esfera (<code>slerp(a, b, t)</code>), con una altura <code>h·sin(πt)</code>.</p>
+        <p><b>Los enlaces se reescriben.</b> Cada ~${SP.rewire} s se aplica una regla inspirada en Wolfram Physics, <code>{x, y} → {x, y}, {y, z}</code>: un enlace se conserva y otro de su vecino salta a un libro nuevo. El arco cambia de destino poco a poco.</p>
+        <p><b>Todo se mueve.</b> Los pozos derivan despacio sobre ejes propios (rotación de Rodrigues). El sol se dibuja en perspectiva y brilla más por delante. Arrástralo para girarlo: conserva la inercia.</p>
+      </div>`;
+  }
+
+  async function galInfoFill() {
+    const box = $id('homeInfoBody');
+    box.innerHTML = `<div class="msh"><b>Galaxia de lectores</b><span class="mono-caps">Cargando…</span></div>`;
+    let g; try { const r = await fetch(`${GALAXY_URL}/galaxy`, { cache: 'no-store' }); if (!r.ok) throw 0; g = await r.json(); }
+    catch { box.innerHTML = `<div class="msh"><b>Galaxia de lectores</b><span class="mono-caps">Sin conexión con la galaxia</span></div>`; return; }
+    const now = Date.now(), week = now - 7 * 864e5, me = galOn() ? galIdentity(false)?.id : null;
+    let nR = 0, nB = 0, nP = 0, myP = 0; const ev = [];
+    for (const s of g.suns) {
+      if (s.joined >= week) nR++;
+      for (const [p, t0] of s.books) { const t = Math.max(t0, s.joined); ev.push([t, p]); if (t >= week) { nB++; nP += p; } if (s.id === me) myP += p; }
+    }
+    ev.sort((a, b) => a[0] - b[0]);
+    // curva de crecimiento: páginas acumuladas desde el primer sol hasta hoy
+    let spark = '';
+    if (ev.length) {
+      const t0 = ev[0][0], span = Math.max(864e5, now - t0), N = 60, pts = []; let acc = 0, i = 0;
+      for (let k = 0; k <= N; k++) { const tk = t0 + span * k / N; while (i < ev.length && ev[i][0] <= tk) acc += ev[i++][1]; pts.push(acc); }
+      const mx = Math.max(1, pts[N]), xy = pts.map((v, k) => `${(k / N * 300).toFixed(1)},${(58 - v / mx * 54).toFixed(1)}`).join(' ');
+      spark = `<svg class="spark" viewBox="0 0 300 60" preserveAspectRatio="none" aria-label="Páginas acumuladas desde el primer sol"><polygon points="0,60 ${xy} 300,60" fill="currentColor" opacity=".12"/><polyline points="${xy}" fill="none" stroke="currentColor" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>
+        <p class="hint mono-caps">Páginas acumuladas desde el ${new Date(t0).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</p>`;
+    }
+    box.innerHTML = `<div class="msh"><b>Galaxia de lectores</b><span class="mono-caps">Cómo funciona</span></div>
+      <div class="kpis">${kpi(g.readers, 'lectores')}${kpi(g.books, 'libros')}${kpi(g.pages, 'páginas')}</div>
+      <p class="hint mono-caps">Últimos 7 días: +${nfES.format(nR)} lectores · +${nfES.format(nB)} libros · +${nfES.format(nP)} páginas${me ? ` · tus páginas: ${nfES.format(myP)} (${g.pages ? Math.round(myP / g.pages * 100) : 0} %)` : ''}</p>
+      ${spark}
+      <div class="iex">
+        <p><b>Páginas y libros.</b> Cada página es una estrella y cada libro, una estrella grande. Cuando se añade un libro estalla como una supernova y sus páginas se reparten en un cúmulo a su alrededor. Luego la rotación estira el cúmulo en una corriente.</p>
+        <p><b>Dos brazos.</b> Los libros se colocan sobre dos brazos opuestos que siguen una espiral logarítmica, <code>θ = θ₀ + ln R / tan i</code>, con una inclinación <code>i = 14°</code>. La dispersión alrededor del brazo es <code>σ = 0,22 + 5·e^(−R/2,2)</code>: en el centro se abre del todo y forma un núcleo redondo.</p>
+        <p><b>Crece de dentro afuera.</b> Con pocos lectores, los libros se reparten por un disco exponencial, <code>Σ(R) ∝ e^(−R/4,3 kpc)</code>. A partir de 48 lectores, cada uno ocupa su anillo según el orden de llegada, <code>R ≈ 1 + 26·√(n/N)</code>: los primeros forman el núcleo y los nuevos alargan los brazos.</p>
+        <p><b>Rotación.</b> El patrón entero gira a velocidad <code>Ωₚ</code> y el centro algo más rápido, <code>Ωₚ·(1 + 0,65·e^(−R/3))</code>. Hacia el borde el disco se engrosa (flare) y se alabea (warp), como en las galaxias reales.</p>
+        <p><b>En la tarjeta gráfica.</b> La posición de cada estrella se calcula en el procesador gráfico, así que puede dibujar más de un millón de páginas.</p>
+      </div>`;
   }
 
   // ============================================================ compartir la app (pestaña Info)
@@ -1467,7 +1558,7 @@
     ['tabScan', 'tabCat', 'tabLib'].forEach(t => $id(t)?.classList.remove('active'));
     $id('homeView').hidden = false; $id('tabHome').classList.add('active');
     history.replaceState(null, '', location.pathname);
-    cameraFor(false); renderHome();
+    cameraFor(false); renderHome(); homeChrome();
   }
   function renderHome() { if (!$id('homeView').hidden && !GALX.open) startSun(); }
   function buildNav() {
@@ -1478,10 +1569,10 @@
     ['tabLib', 'tabData', 'tabHome', 'tabScan', 'tabCat'].forEach(id => $id(id) && nav.append($id(id)));
     $id('libView').insertAdjacentHTML('afterend', `
       <div id="homeView" class="homev" hidden><canvas id="sunCanvas" aria-label="Tu biblioteca como un sol de páginas"></canvas></div>`);
-    buildSunConfig(); buildGalaxy();
+    buildSunConfig(); buildHomeUI();
     $id('tabHome').onclick = showHome;
     ['tabScan', 'tabCat', 'tabLib'].forEach(id => $id(id).addEventListener('click', () => {   // después del setTab de index.html
-      homeOn = false; $id('homeView').hidden = true; $id('tabHome').classList.remove('active'); stopSun();
+      homeOn = false; $id('homeView').hidden = true; $id('tabHome').classList.remove('active'); stopSun(); homeChrome();
       cameraFor(id === 'tabScan' && !!scanMode);
     }));
     new MutationObserver(() => { if (homeOn) { stopSun(); renderHome(); } }).observe($id('catCount'), { childList: true, characterData: true, subtree: true });
