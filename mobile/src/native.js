@@ -398,6 +398,8 @@
             <div class="infoh"><div class="ilogo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="-50 -32 100 66" role="img" aria-label="BiblioScan"><path fill="currentColor" fill-rule="evenodd" d="M-46 30 L-46 -28 L-27 -28 A24 24 0 0 1 -3 -4 L0 1 L3 -4 A24 24 0 0 1 27 -28 L46 -28 L46 30 Z M0.00 -9.70 Q2.21 6.79 18.70 9.00 Q2.21 11.21 0.00 27.70 Q-2.21 11.21 -18.70 9.00 Q-2.21 6.79 0.00 -9.70 Z"/></svg></div><div><b>BiblioScan</b><span class="mono-caps">Versión ${escH(window.BIBLIO_VERSION || '—')}</span></div></div>
             <a class="ilink mono-caps" href="https://github.com/KMN43/biblioscan" target="_blank" rel="noopener">${svg('ext')}<span>github.com/KMN43/biblioscan</span></a>
             <div class="btns iupd">${ib('updCheck', 'rotate', 'Buscar actualizaciones')}<button id="updGet" class="ibtn primary" hidden aria-label="Descargar e instalar" title="Descargar e instalar">${svg('download')}</button><span id="updMsg" class="mono-caps"></span></div>
+            <div class="mono-caps lbl">Guía de uso</div>
+            <div class="btns">${ib('tutOpen', 'play', 'Ver la guía de uso', 'data-pri')}<span class="hint mono-caps">Cómo usar BiblioScan, paso a paso</span></div>
             <div class="mono-caps lbl">Galaxia de lectores</div>
             <p>Únete a la galaxia común de BiblioScan: cada página de tu biblioteca es una estrella y cada libro, una estrella grande.
                Solo se sube el número de páginas de cada libro y cuándo lo añadiste; nunca títulos, autores ni ISBN.</p>
@@ -434,6 +436,7 @@
     };
     $('dataClose').onclick = close;
     $('shareQR').onclick = showShareQR;
+    $('tutOpen').onclick = () => { close(); openTutorial(); };
     $('shareLink').onclick = shareLink;
     $('updCheck').onclick = async () => {
       const msg = $('updMsg'), get = $('updGet');
@@ -1532,6 +1535,57 @@
       </div>`;
   }
 
+  // ============================================================ GUÍA DE USO (tutorial deslizable)
+  // Sale sola la primera vez que se abre la app en el móvil y se puede volver a ver desde Info → Guía de uso.
+  // Las capturas (mobile/src/tutorial/) se dibujan con el mismo motor que el vídeo, con libros inventados.
+  const TUT = [
+    ['01-intro', 'Bienvenido a BiblioScan', 'Tu biblioteca en el móvil. En un minuto te enseño lo básico.'],
+    ['02-scan', 'Escanea', 'En Scan, toca «+» y apunta al código de barras. La ficha se rellena sola: confírmala y el libro queda guardado.'],
+    ['03-look', 'Consulta', 'La lupa busca un libro sin guardarlo. Si ya lo tienes, te dice en qué balda está; si no, puedes guardarlo en tu wishlist ♡.'],
+    ['04-cat', 'Catálogo', 'Desliza entre portadas o cambia a lista. Filtra por editorial, idioma o wishlist y mira tus estadísticas.'],
+    ['05-shelf', 'Biblioteca', 'Tus baldas reales. Mantén pulsado un libro y arrástralo a otra balda para ordenarlas.'],
+    ['06-home', 'Tu sol', 'En Home tu biblioteca es un sol: cada página es un punto y cada libro, un nodo. Los botones de la derecha cambian a la galaxia, abren los ajustes y explican cómo funciona.'],
+    ['07-galaxy', 'Galaxia de lectores', 'Únete desde Info y tu biblioteca se suma a la de otros lectores. Solo se comparten números, nunca títulos.'],
+    ['08-info', 'Info', 'Busca actualizaciones, comparte la app con un QR y haz copias de seguridad de tu biblioteca.'],
+  ];
+  const TUTS = { i: 0 };
+  function buildTutorial() {
+    if ($id('tut')) return;
+    document.body.insertAdjacentHTML('beforeend', `
+      <div id="tut" class="tut" hidden role="dialog" aria-modal="true" aria-label="Guía de uso de BiblioScan">
+        <button id="tutSkip" class="tutskip mono-caps" type="button">Saltar</button>
+        <div class="tutin" id="tutIn">
+          <div class="tutimg"><img id="tutImg" alt=""></div>
+          <div class="tuttxt"><b id="tutTitle"></b><p id="tutText"></p></div>
+          <div class="tutdots" id="tutDots">${TUT.map((_, i) => `<i data-i="${i}"></i>`).join('')}</div>
+          <div class="tutnav">${ib('tutPrev', 'prev', 'Anterior')}<button id="tutNext" class="tutnext" type="button">Siguiente</button></div>
+        </div>
+      </div>`);
+    TUT.forEach(([f]) => { const im = new Image(); im.src = `tutorial/${f}.jpg`; });   // precarga
+    const go = i => {
+      TUTS.i = Math.max(0, Math.min(TUT.length - 1, i));
+      const [f, title, text] = TUT[TUTS.i], last = TUTS.i === TUT.length - 1;
+      $id('tutImg').src = `tutorial/${f}.jpg`; $id('tutImg').alt = title;
+      $id('tutTitle').textContent = title; $id('tutText').textContent = text;
+      $id('tutDots').querySelectorAll('i').forEach((d, k) => d.classList.toggle('on', k === TUTS.i));
+      $id('tutPrev').style.visibility = TUTS.i ? 'visible' : 'hidden';
+      $id('tutNext').textContent = last ? 'Empezar' : 'Siguiente';
+      const box = $id('tutIn'); box.classList.remove('in'); void box.offsetWidth; box.classList.add('in');
+    };
+    TUTS.go = go;
+    const done = () => { $id('tut').hidden = true; ready.then(() => { kvSet('tutorial_seen', '1'); persist(); }); };
+    $id('tutSkip').onclick = done;
+    $id('tutPrev').onclick = () => go(TUTS.i - 1);
+    $id('tutNext').onclick = () => TUTS.i === TUT.length - 1 ? done() : go(TUTS.i + 1);
+    $id('tutDots').addEventListener('click', e => { const d = e.target.closest('i'); if (d) go(+d.dataset.i); });
+    // deslizar con el dedo
+    let sx = null;
+    $id('tut').addEventListener('pointerdown', e => { sx = e.clientX; });
+    $id('tut').addEventListener('pointerup', e => { if (sx == null) return; const dx = e.clientX - sx; sx = null; if (Math.abs(dx) > 50) go(TUTS.i + (dx < 0 ? 1 : -1)); });
+    document.addEventListener('keydown', e => { if ($id('tut').hidden) return; if (e.key === 'ArrowRight') go(TUTS.i + 1); if (e.key === 'ArrowLeft') go(TUTS.i - 1); if (e.key === 'Escape') done(); });
+  }
+  function openTutorial() { buildTutorial(); TUTS.go(0); $id('tut').hidden = false; }
+
   // ============================================================ compartir la app (pestaña Info)
   const APP_URL = 'https://github.com/KMN43/biblioscan/releases/latest/download/BiblioScan.apk';
   function showShareQR() {
@@ -1584,6 +1638,6 @@
     iconizeButtons(); buildPanel(); hookGalaxyInfo(); buildMobileCatalog(); buildShelfBrowser();
     if (isPhone()) { buildScan(); buildLook(); hookConfirm(); }
     buildNav(); setTimeout(checkUpdate, 2500);
-    ready.then(() => { if (galOn()) galSoon(8); });   // al abrir, por si cambió algo sin conexión
+    ready.then(() => { if (galOn()) galSoon(8); if (isPhone() && kvGet('tutorial_seen') !== '1') openTutorial(); });   // la guía, la primera vez   // al abrir, por si cambió algo sin conexión
   });
 })();

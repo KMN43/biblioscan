@@ -39,7 +39,9 @@ function logo(cx, cy, s, bookK = 1, starK = 1, rot = 0, fg = K, bg = O) {   // s
 }
 
 // ---------- piezas comunes ----------
+let NOCAP = false;
 function caption(txt, u, a, b, col = K) {
+  if (NOCAP) return;
   const k = eo(seg(u, a, a + .5)) * (1 - seg(u, b - .4, b));
   if (k <= 0) return;
   x.globalAlpha = k; x.fillStyle = col; x.font = SG(500, 104); x.textAlign = 'center'; x.textBaseline = 'alphabetic';
@@ -304,6 +306,58 @@ function frame(t) {
     x.save(); x.beginPath(); x.arc(WIPE[i][0], WIPE[i][1], eio(wk) * 2300, 0, 7); x.clip(); fn(u); x.restore();
   } else fn(u);
 }
+
+// ---------- capturas fijas para el tutorial de la app ----------
+function ibtn(cx, cy, r, glyph, fill, ink = K, bg = O) {
+  x.lineWidth = 3; x.strokeStyle = ink; x.beginPath(); x.arc(cx, cy, r, 0, 7);
+  if (fill) { x.fillStyle = ink; x.fill(); } else x.stroke();
+  const c = fill ? bg : ink; x.strokeStyle = c; x.fillStyle = c; x.lineWidth = 4; x.lineCap = 'round'; x.lineJoin = 'round'; glyph(c);
+}
+const G = {
+  spiral: (cx, cy) => () => { x.beginPath(); for (let a = 0; a < 7; a += .1) { const r = 2 + a * 3; x.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r * .8); } x.stroke(); x.beginPath(); for (let a = 0; a < 7; a += .1) { const r = 2 + a * 3; x.lineTo(cx - Math.cos(a) * r, cy - Math.sin(a) * r * .8); } x.stroke(); },
+  sliders: (cx, cy) => () => { x.beginPath(); x.moveTo(cx - 18, cy - 8); x.lineTo(cx + 18, cy - 8); x.moveTo(cx - 18, cy + 8); x.lineTo(cx + 18, cy + 8); x.stroke(); x.beginPath(); x.arc(cx + 8, cy - 8, 5, 0, 7); x.fill(); x.beginPath(); x.arc(cx - 8, cy + 8, 5, 0, 7); x.fill(); },
+  info: (cx, cy) => () => { x.fillRect(cx - 2.5, cy - 4, 5, 18); x.fillRect(cx - 2.5, cy - 13, 5, 5); },
+  star: (cx, cy) => c => star(cx, cy, 18, c),
+  eye: (cx, cy) => () => { x.beginPath(); x.ellipse(cx, cy, 20, 11, 0, 0, 7); x.stroke(); x.beginPath(); x.arc(cx, cy, 5, 0, 7); x.fill(); },
+  trash: (cx, cy) => () => { x.beginPath(); x.moveTo(cx - 16, cy - 10); x.lineTo(cx + 16, cy - 10); x.moveTo(cx - 11, cy - 10); x.lineTo(cx - 8, cy + 16); x.lineTo(cx + 8, cy + 16); x.lineTo(cx + 11, cy - 10); x.stroke(); },
+  qr: (cx, cy) => () => { [[-14, -14], [4, -14], [-14, 4]].forEach(([dx, dy]) => x.strokeRect(cx + dx, cy + dy, 10, 10)); x.fillRect(cx + 6, cy + 6, 6, 6); },
+  share: (cx, cy) => () => { [[10, -12], [-10, 0], [10, 12]].forEach(([dx, dy]) => { x.beginPath(); x.arc(cx + dx, cy + dy, 5, 0, 7); x.fill(); }); x.beginPath(); x.moveTo(cx - 10, cy); x.lineTo(cx + 10, cy - 12); x.moveTo(cx - 10, cy); x.lineTo(cx + 10, cy + 12); x.stroke(); },
+  db: (cx, cy) => () => { x.beginPath(); x.ellipse(cx, cy - 12, 14, 5, 0, 0, 7); x.stroke(); x.beginPath(); x.moveTo(cx - 14, cy - 12); x.lineTo(cx - 14, cy + 12); x.ellipse(cx, cy + 12, 14, 5, 0, Math.PI, 0, true); x.lineTo(cx + 14, cy - 12); x.stroke(); },
+  upd: (cx, cy) => () => { x.beginPath(); x.arc(cx, cy, 15, -.3, 4.6); x.stroke(); x.beginPath(); x.moveTo(cx + 15, cy - 14); x.lineTo(cx + 15, cy - 3); x.lineTo(cx + 4, cy - 3); x.stroke(); },
+};
+function stillCat() {
+  const gr = x.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#f6dccb'); gr.addColorStop(1, P); x.fillStyle = gr; x.fillRect(0, 0, W, H);
+  x.fillStyle = K; x.font = SG(500, 168); x.textAlign = 'left'; x.fillText('Mares', 70, 900); x.fillText('de tinta', 70, 1060);
+  x.font = MONO(500, 34); x.globalAlpha = .7; x.fillText('Ana Ríos · 2021 · Faro', 74, 1150); x.globalAlpha = 1;
+  [[70, 150], [180, 150]].forEach(([cx]) => {});
+  ibtn(110, 210, 44, () => { x.beginPath(); x.moveTo(92, 196); x.lineTo(128, 196); x.lineTo(114, 214); x.lineTo(114, 228); x.lineTo(106, 224); x.lineTo(106, 214); x.closePath(); x.stroke(); });
+  ibtn(220, 210, 44, () => { [[-14, 8], [-2, -4], [10, -14]].forEach(([dx, h]) => x.fillRect(220 + dx - 4, 226 + Math.min(0, h) - 14, 8, 14 - Math.min(0, h))); });
+  ibtn(970, 210, 44, () => { [-10, 0, 10].forEach(d => { x.beginPath(); x.moveTo(952, 210 + d); x.lineTo(988, 210 + d); x.stroke(); }); });
+  ibtn(960, 1100, 46, () => { x.strokeRect(942, 1084, 36, 32); x.beginPath(); x.moveTo(946, 1112); x.lineTo(958, 1098); x.lineTo(966, 1106); x.lineTo(974, 1096); x.stroke(); });
+  [0, 1, 2, 3, 4].forEach(i => { x.fillStyle = K; x.globalAlpha = i === 1 ? 1 : .25; x.beginPath(); x.arc(1030, 760 + i * 36, i === 1 ? 9 : 6, 0, 7); x.fill(); }); x.globalAlpha = 1;
+  nav(4);
+}
+function stillHome() {
+  x.fillStyle = O; x.fillRect(0, 0, W, H);
+  sunDots(3, 340, 540, 880, C, 1);
+  [[1450, 'spiral'], [1560, 'sliders'], [1670, 'info']].forEach(([cy, g]) => ibtn(970, cy - 30, 46, G[g](970, cy - 30), false));
+  nav(2);
+}
+function stillInfo() {
+  x.fillStyle = P; x.fillRect(0, 0, W, H);
+  x.fillStyle = O; rr(70, 120, 130, 130, 26); x.fill(); logo(135, 190, 1.05, 1, 1, 0, K, O);
+  x.fillStyle = K; x.textAlign = 'left'; x.font = SG(500, 70); x.fillText('BiblioScan', 230, 185); x.font = MONO(500, 30); x.globalAlpha = .6; x.fillText('VERSIÓN 1.9', 232, 232); x.globalAlpha = 1;
+  const sec = (y, label, btns) => { x.fillStyle = K; x.globalAlpha = .25; x.fillRect(70, y - 70, 940, 2); x.globalAlpha = .6; x.font = MONO(600, 30); x.fillText(label, 70, y - 20); x.globalAlpha = 1;
+    btns.forEach(([g, fill], i) => ibtn(130 + i * 130, y + 70, 50, G[g](130 + i * 130, y + 70), fill)); };
+  sec(420, 'ACTUALIZAR', [['upd', false]]);
+  sec(700, 'GALAXIA DE LECTORES', [['star', true], ['eye', false], ['trash', false]]);
+  sec(980, 'COMPARTIR BIBLIOSCAN', [['qr', true], ['share', false]]);
+  sec(1260, 'COPIA DE SEGURIDAD', [['db', true]]);
+  nav(1, O, K);
+}
+window.renderStill = name => { NOCAP = true; x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1;
+  ({ intro: () => frame(3.2), scan: () => frame(9.6), look: () => frame(15.5), cat: stillCat, shelf: () => frame(20.6), home: stillHome, galaxy: () => frame(35.2), info: stillInfo })[name]();
+  NOCAP = false; };
 
 // ---------- vista previa y exportación ----------
 let t = 0, playing = false, last = 0;

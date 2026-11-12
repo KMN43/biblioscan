@@ -25,6 +25,7 @@ writeFileSync(join(WWW, 'index.html'), html);
 
 cpSync(join(HERE, 'src', 'native.js'), join(WWW, 'native.js'));
 cpSync(join(HERE, 'src', 'mobile.css'), join(WWW, 'mobile.css'));
+cpSync(join(HERE, 'src', 'tutorial'), join(WWW, 'tutorial'), { recursive: true });   // capturas de la guía de uso
 cpSync(nm('@capacitor/core/dist/capacitor.js'), join(WWW, 'capacitor.js'));
 cpSync(nm('sql.js/dist/sql-wasm.js'), join(WWW, 'vendor', 'sql-wasm.js'));
 cpSync(nm('sql.js/dist/sql-wasm.wasm'), join(WWW, 'vendor', 'sql-wasm.wasm'));
