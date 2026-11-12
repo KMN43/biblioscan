@@ -4,6 +4,10 @@
 
 **Catálogo óptico para tu biblioteca personal.** Apunta la webcam al código de barras de un libro y BiblioScan lee el ISBN, busca la ficha en **Google Books**, **todostuslibros** (catálogo de las librerías españolas) y **Open Library**, y la guarda en una base de datos SQLite local cuando la confirmas. Después puedes explorar el catálogo, filtrarlo y colocar cada libro en tus estanterías reales.
 
+**Vídeo de 40 segundos:** escanear, consultar, ordenar, tu sol y la galaxia de lectores.
+
+<a href="docs/BiblioScan-video.mp4"><img src="docs/img/video-portada.jpg" alt="Fotograma del vídeo: escaneando el código de barras de un libro" width="220"></a>
+
 ![Escáner: confirmación de un libro](docs/img/01-escaner-confirmacion.png)
 
 - 📷 **Escáner por cámara**: lee códigos de barras (ZXing) y texto (Tesseract OCR) en directo.
@@ -293,6 +297,7 @@ biblioscan/
 ├── logo.py            # El logo (libro + estrella): genera el SVG, el icono del .exe y los de Android
 ├── biblioscan.ico      # Icono de la app
 ├── requirements.txt    # Dependencias de la versión de escritorio
+├── docs/BiblioScan-video.mp4  # Vídeo de 40 s (vertical); se genera desde docs/video/animacion.html
 └── docs/img/           # Capturas de esta guía
 ```
 
