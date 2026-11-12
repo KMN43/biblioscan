@@ -114,7 +114,7 @@ input[type=range] { flex: 1; min-width: 0; accent-color: var(--ink); }
   const qs = new URLSearchParams(location.search), meId = qs.get('me') || '';
   if (qs.has('app')) document.body.classList.add('inapp');   // dentro de BiblioScan: hueco para el botón «Volver»
   const readers = data.suns.map(su => ({ id: su.id, joined: su.joined,
-    books: su.books.map(([p, t]) => ({ pages: Math.max(40, p || 200), t: Math.max(t, su.joined) })) })).filter(r => r.books.length);
+    books: su.books.map(([p, t]) => ({ real: p || 0, pages: Math.max(40, p || 200), t: Math.max(t, su.joined) })) })).filter(r => r.books.length);
   if (!readers.length) { say('Aún no hay soles. Únete desde la app: Info → Galaxia.'); return; }
   readers.sort((a, b) => a.joined - b.joined);
   const START = readers[0].joined - DAY / 2, DAYS = Math.max(1, (Date.now() - START) / DAY), NREAD = readers.length;
@@ -136,14 +136,16 @@ input[type=range] { flex: 1; min-width: 0; accent-color: var(--ink); }
     const band = 1.0 + 26 * Math.sqrt((i + .5) / Math.max(NREAD, 6)), mine = i === YOU ? 2 : 0;   // de dentro hacia fuera
     events.push([rd.joined, 0, 0, 1]);
     for (const bk of rd.books) {
-      let Rb = Math.abs(band + gauss() * (1.5 + band * .3)); if (Rb < .25) Rb = .25 + R() * .5;
+      // con pocos lectores, sus libros se reparten por todo el disco (perfil exponencial); con muchos, cada uno en su anillo
+      let Rb = R() < Math.min(1, NREAD / 30) ? Math.abs(band + gauss() * (1.5 + band * .3)) : Math.min(29, -6.5 * Math.log(1 - R() * .985));
+      if (Rb < .25) Rb = .25 + R() * .5;
       const inter = R() < .14, sig = .2 + 2.2 * Math.exp(-Rb / 2.2);
       const pb = inter ? R() * Math.PI * 2 : (R() < .5 ? 0 : Math.PI) + gauss() * sig, zb = gauss() * .5;
       const put = (dR, dp, z, size, flags) => { const k = count * 4; A0[k] = Rb; A0[k + 1] = pb; A0[k + 2] = dR; A0[k + 3] = dp; A1[k] = z; A1[k + 1] = bk.t; A1[k + 2] = size; A1[k + 3] = flags; count++; };
       put(0, 0, zb * .4, .9 + Math.sqrt(bk.pages) / 24, 1 + mine);
       const n = Math.floor(bk.pages / PER) + (R() < (bk.pages / PER) % 1 ? 1 : 0), spread = .12 + Math.sqrt(bk.pages) / 140;
       for (let p = 0; p < n; p++) put(gauss() * spread, gauss() * (spread / Rb + .06), gauss() * .8, 1, mine);
-      events.push([bk.t, 1, bk.pages, 0]);
+      events.push([bk.t, 1, bk.real, 0]);
     }
   });
   events.sort((a, b) => a[0] - b[0]);
@@ -152,7 +154,7 @@ input[type=range] { flex: 1; min-width: 0; accent-color: var(--ink); }
   const VS = `
     precision highp float;
     attribute vec4 a0; attribute vec4 a1;
-    uniform mat4 uVP; uniform float uT, uDay, uPx, uMe, uMob, uBurst, uFlash;
+    uniform mat4 uVP; uniform float uT, uDay, uPx, uMe, uMob, uBurst, uFlash, uGain, uSize;
     uniform float kS, Op, eB, RB, h0, fl, wa, Rw, Rmax;
     varying float vA; varying vec3 vC; varying float vHot;
     void main() {
@@ -174,10 +176,10 @@ input[type=range] { flex: 1; min-width: 0; accent-color: var(--ink); }
       float persp = clamp(28.0 / clip.w, 0.35, 6.0);
       float flash = isBook * exp(-age / uFlash);                           // supernova: destello al añadirse
       vHot = flash;
-      float base = isBook > 0.5 ? a1.z * (0.6 + 0.4 * persp) : (uMob > 0.5 ? 1.3 : 1.0) * clamp(persp * 0.6, 0.8, 1.8);
+      float base = isBook > 0.5 ? a1.z * (0.6 + 0.4 * persp) : (uMob > 0.5 ? 1.3 : 1.0) * uSize * clamp(persp * 0.6, 0.8, 1.8);
       gl_PointSize = uPx * (base + flash * 9.0);
       float dens = 0.45 + 0.55 * exp(-R / 5.0);
-      vA = isBook > 0.5 ? 0.42 + flash : 0.36 * dens * (0.6 + 0.4 * burst);
+      vA = isBook > 0.5 ? min(1.0, 0.42 * uGain) + flash : min(1.0, 0.36 * uGain * dens) * (0.6 + 0.4 * burst);
       vec3 c = mix(vec3(1.0, 0.97, 0.92), vec3(0.93, 0.94, 0.96), smoothstep(3.0, 18.0, R));   // casi blanco
       vC = mix(c, vec3(1.0, 0.31, 0.07), mine * uMe);
     }`;
@@ -199,13 +201,17 @@ input[type=range] { flex: 1; min-width: 0; accent-color: var(--ink); }
   gl.uniform1f(U('eB'), DYN.eBar); gl.uniform1f(U('RB'), DYN.Rbar); gl.uniform1f(U('h0'), DYN.h0);
   gl.uniform1f(U('fl'), DYN.flare); gl.uniform1f(U('wa'), DYN.warp); gl.uniform1f(U('Rw'), DYN.Rwarp); gl.uniform1f(U('Rmax'), DYN.Rmax);
   gl.uniform1f(U('uMob'), mobile ? 1 : 0);
+  // pocas estrellas → cada una más grande y brillante (con un millón vuelve al aspecto de la referencia)
+  const gain = Math.max(1, Math.min(4, Math.sqrt(500000 / Math.max(1, count))));
+  gl.uniform1f(U('uGain'), gain); gl.uniform1f(U('uSize'), Math.min(2.2, Math.sqrt(gain)));
   gl.uniform1f(U('uBurst'), Math.min(1.6, DAYS * .022)); gl.uniform1f(U('uFlash'), Math.min(1.4, DAYS * .02));   // el estallido dura ~1/50 de la línea de tiempo
   gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); gl.disable(gl.DEPTH_TEST);
 
   // ---------- cámara orbital ----------
   let W = 0, H = 0, dpr = 1;
   const cam = { yaw: .5, pitch: .42, dist: 62, ty: .5, tp: .42, td: 62 };
-  function resize() { dpr = Math.min(devicePixelRatio || 1, mobile ? 1.5 : 2); W = Math.round(cv.clientWidth * dpr); H = Math.round(cv.clientHeight * dpr); cv.width = W; cv.height = H; gl.viewport(0, 0, W, H); }
+  function resize() { dpr = Math.min(devicePixelRatio || 1, mobile ? 1.5 : 2); W = Math.round(cv.clientWidth * dpr); H = Math.round(cv.clientHeight * dpr); cv.width = W; cv.height = H; gl.viewport(0, 0, W, H);
+    const fitD = Math.min(150, 62 * Math.max(1, .95 / (W / H))); if (!cam.fit || Math.abs(cam.td - cam.fit) < 1) cam.td = cam.dist = fitD; cam.fit = fitD; }   // en vertical, más lejos para que quepa
   addEventListener('resize', resize); resize();
   function viewProj() {
     const f = 1 / Math.tan(.42), asp = W / H, n = .5, fa = 400;
