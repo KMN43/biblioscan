@@ -8,8 +8,8 @@ directory = "./public"
 binding = "ASSETS"
 run_worker_first = ["/galaxy", "/sun"]
 
-# Base de datos D1 (plan gratuito). database_id se rellena tras `npx wrangler d1 create biblioscan-galaxia`.
+# Base de datos D1 (plan gratuito). creada en la región WEUR.
 [[d1_databases]]
 binding = "DB"
 database_name = "biblioscan-galaxia"
-database_id = "PENDIENTE"
+database_id = "926ba6dc-b169-46b2-8d8d-5a77eb79c3e2"
