@@ -2,6 +2,12 @@ name = "biblioscan-galaxia"
 main = "src/index.js"
 compatibility_date = "2026-10-01"
 
+# El visualizador (public/index.html) se sirve como archivo estático; /galaxy y /sun los atiende el Worker.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = ["/galaxy", "/sun"]
+
 # Base de datos D1 (plan gratuito). database_id se rellena tras `npx wrangler d1 create biblioscan-galaxia`.
 [[d1_databases]]
 binding = "DB"

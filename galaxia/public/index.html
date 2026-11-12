@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Galaxia BiblioScan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Una pantalla: la galaxia en 3D a sangre, cabecera arriba y línea de tiempo abajo, flotando sobre el negro */
+:root {
+  --sky: #000000;        /* espacio */
+  --ink: #ecebe8;        /* texto, blanco de estrella */
+  --muted: #8d8a85;
+  --you: #ff4f12;        /* naranja BiblioScan: solo para «mis páginas» */
+  --glass: rgba(14, 14, 14, .72);
+  --line: rgba(236, 235, 232, .16);
+  --display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; margin: 0; }
+:root { padding-top: env(safe-area-inset-top, 0px); }
+[hidden] { display: none !important; }
+body { background: var(--sky); color: var(--ink); font-family: var(--mono); overflow: hidden; }
+#sky { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+#sky.drag { cursor: grabbing; }
+.top { position: fixed; left: 0; right: 0; top: 0; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;
+  padding-top: calc(14px + env(safe-area-inset-top, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); pointer-events: none; }
+.top > * { pointer-events: auto; }
+h1 { font-family: var(--display); font-weight: 500; font-size: 24px; letter-spacing: -.01em; margin: 0; line-height: 1.05; text-wrap: balance; }
+.sub { margin: 4px 0 0; font-size: 11px; color: var(--muted); letter-spacing: .04em; }
+.stats { display: flex; gap: 18px; font-variant-numeric: tabular-nums; text-align: right; }
+.stats b { display: block; font-family: var(--display); font-size: 19px; font-weight: 500; }
+.stats small { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; }
+.bottom { position: fixed; left: 0; right: 0; bottom: 0; padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+.bottom > * { pointer-events: auto; }
+.bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--glass); border: 1px solid var(--line); border-radius: 22px; padding: 8px 10px; backdrop-filter: blur(8px); max-width: 760px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+.row { display: flex; align-items: center; gap: 10px; flex: 1 1 280px; min-width: 0; }
+button { font: 600 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; cursor: pointer; white-space: nowrap; }
+button:hover { border-color: var(--ink); }
+button[aria-pressed="true"] { border-color: var(--you); color: var(--you); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+button.pri { background: var(--ink); border-color: var(--ink); color: #000; }
+input[type=range] { flex: 1; min-width: 0; accent-color: var(--ink); }
+#date { font-variant-numeric: tabular-nums; font-size: 12px; min-width: 7.5em; text-align: right; }
+.hint { text-align: center; font-size: 10px; color: var(--muted); letter-spacing: .08em; }
+.phys { position: fixed; left: max(16px, env(safe-area-inset-left, 0px)); top: calc(88px + env(safe-area-inset-top, 0px)); width: min(330px, calc(100% - 32px)); background: var(--glass); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; backdrop-filter: blur(8px); box-sizing: border-box; font-size: 11.5px; line-height: 1.55; max-height: calc(100% - 230px); overflow: auto; }
+.phys h2 { font-family: var(--display); font-weight: 500; font-size: 16px; margin: 0 0 8px; }
+.phys p { margin: 0 0 8px; color: #c9c7c2; }
+.phys code { font-family: var(--mono); color: var(--ink); }
+.phys dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 8px 0 0; font-variant-numeric: tabular-nums; }
+.phys dt { color: var(--muted); } .phys dd { margin: 0; text-align: right; }
+.nogl { position: fixed; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; color: var(--muted); }
+@media (max-width: 560px) { .stats { gap: 12px; } .stats b { font-size: 15px; } h1 { font-size: 20px; } .phys { top: auto; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); max-height: 45%; } }
+</style>
+</head>
+<body>
+
+<canvas id="sky" aria-label="Galaxia en la que cada estrella es una página y cada libro una estrella grande"></canvas>
+<header class="top">
+  <div><h1>Galaxia BiblioScan</h1><p class="sub"><span id="scale">Cargando la galaxia…</span></p></div>
+  <div class="stats" aria-live="polite">
+    <div><b id="sReaders">0</b><small>lectores</small></div>
+    <div><b id="sBooks">0</b><small>libros</small></div>
+    <div><b id="sPages">0</b><small>páginas</small></div>
+  </div>
+</header>
+<aside class="phys" id="phys" hidden>
+  <h2>Cómo se mueve</h2>
+  <p>Cada <b>página</b> es una estrella y cada <b>libro</b> es una estrella grande. Al añadirlo estalla como una supernova y sus páginas se reparten a su alrededor. La rotación diferencial las estira después en corrientes.</p>
+  <p>Los dos brazos siguen una espiral logarítmica, <code>θ = θ₀ + ln R / tan i</code>, con una inclinación de brazo <code>i = 21°</code>, y giran juntos alrededor de una barra central.</p>
+  <p>La galaxia crece de dentro hacia fuera: los primeros lectores forman el núcleo y los nuevos alargan los brazos.</p>
+</aside>
+<footer class="bottom">
+  <div class="bar">
+    <div class="row">
+      <button id="play" class="pri" type="button">▶ Formación</button>
+      <input id="time" type="range" min="0" max="1000" value="1000" aria-label="Fecha de la galaxia">
+      <span id="date"></span>
+    </div>
+    <div class="row" style="flex: 0 1 auto">
+      <button id="me" type="button" aria-pressed="false" hidden>Mis páginas</button>
+      <button id="info" type="button" aria-pressed="false">Física</button>
+    </div>
+  </div>
+  </footer>
+
+<script>
+(async () => {
+  const cv = document.getElementById('sky');
+  const gl = cv.getContext('webgl', { antialias: false, alpha: false, premultipliedAlpha: false, powerPreference: 'high-performance' });
+  if (!gl) { document.body.insertAdjacentHTML('beforeend', '<div class="nogl">Este navegador no puede dibujar la galaxia (WebGL desactivado).</div>'); return; }
+
+  // ---------- utilidades ----------
+  const mulberry = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  const hash = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+  let R = mulberry(1);
+  const gauss = () => Math.sqrt(-2 * Math.log(R() + 1e-9)) * Math.cos(2 * Math.PI * R());
+  const DAY = 864e5;
+  const say = t => { document.getElementById('scale').textContent = t; };
+  const fmt = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  const num = new Intl.NumberFormat('es-ES');
+
+  // ---------- dinámica (unidades: kpc y unidades de tiempo del modelo) ----------
+  const DYN = { pitch: 21, Op: .045, eBar: .5, Rbar: 1.6, Rmax: 30, h0: .05, flare: 1.2, warp: .35, Rwarp: 20 };
+
+  // ---------- los soles de la galaxia: solo números (páginas de cada libro y cuándo se añadió) ----------
+  let data;
+  try { const r = await fetch('/galaxy', { cache: 'no-store' }); if (!r.ok) throw 0; data = await r.json(); }
+  catch { say('No se pudo cargar la galaxia. Revisa la conexión y recarga.'); return; }
+  const meId = new URLSearchParams(location.search).get('me') || '';
+  const readers = data.suns.map(su => ({ id: su.id, joined: su.joined,
+    books: su.books.map(([p, t]) => ({ pages: Math.max(40, p || 200), t: Math.max(t, su.joined) })) })).filter(r => r.books.length);
+  if (!readers.length) { say('Aún no hay soles. Únete desde la app: Info → Galaxia.'); return; }
+  readers.sort((a, b) => a.joined - b.joined);
+  const START = readers[0].joined - DAY / 2, DAYS = Math.max(1, (Date.now() - START) / DAY), NREAD = readers.length;
+  readers.forEach(r => { r.joined = (r.joined - START) / DAY; r.books.forEach(b => { b.t = (b.t - START) / DAY; }); });
+  const YOU = readers.findIndex(r => r.id === meId);
+  if (YOU >= 0) document.getElementById('me').hidden = false;
+  const totalPages = readers.reduce((a, r) => a + r.books.reduce((s, b) => s + b.pages, 0), 0);
+  const mobile = Math.min(innerWidth, innerHeight) < 700 || /Android|iPhone|iPad/i.test(navigator.userAgent);
+  const CAP = mobile ? 380000 : 1200000, PER = Math.max(1, Math.ceil(totalPages / CAP));
+  say((PER === 1 ? '1 estrella = 1 página' : `1 estrella = ${PER} páginas`) + ' · cada libro, una estrella grande');
+
+  // ---------- partículas: libros (estrellas grandes) y sus páginas (cúmulo alrededor) ----------
+  // a0 = (R del libro, fase del libro, dR, dfase)   a1 = (z gauss, día en que aparece, tamaño, banderas: 1 libro, 2 mío)
+  let count = 0; const est = readers.reduce((a, r) => a + r.books.length + r.books.reduce((s, b) => s + Math.ceil(b.pages / PER), 0), 0);
+  const A0 = new Float32Array(est * 4), A1 = new Float32Array(est * 4);
+  const events = [];   // para los contadores: [día, libros, páginas, lector nuevo]
+  readers.forEach((rd, i) => {
+    R = mulberry(hash(rd.id));                                                            // cada sol, siempre en el mismo sitio
+    const band = 1.0 + 26 * Math.sqrt((i + .5) / Math.max(NREAD, 6)), mine = i === YOU ? 2 : 0;   // de dentro hacia fuera
+    events.push([rd.joined, 0, 0, 1]);
+    for (const bk of rd.books) {
+      let Rb = Math.abs(band + gauss() * (1.5 + band * .3)); if (Rb < .25) Rb = .25 + R() * .5;
+      const inter = R() < .14, sig = .2 + 2.2 * Math.exp(-Rb / 2.2);
+      const pb = inter ? R() * Math.PI * 2 : (R() < .5 ? 0 : Math.PI) + gauss() * sig, zb = gauss() * .5;
+      const put = (dR, dp, z, size, flags) => { const k = count * 4; A0[k] = Rb; A0[k + 1] = pb; A0[k + 2] = dR; A0[k + 3] = dp; A1[k] = z; A1[k + 1] = bk.t; A1[k + 2] = size; A1[k + 3] = flags; count++; };
+      put(0, 0, zb * .4, .9 + Math.sqrt(bk.pages) / 24, 1 + mine);
+      const n = Math.floor(bk.pages / PER) + (R() < (bk.pages / PER) % 1 ? 1 : 0), spread = .12 + Math.sqrt(bk.pages) / 140;
+      for (let p = 0; p < n; p++) put(gauss() * spread, gauss() * (spread / Rb + .06), gauss() * .8, 1, mine);
+      events.push([bk.t, 1, bk.pages, 0]);
+    }
+  });
+  events.sort((a, b) => a[0] - b[0]);
+
+  // ---------- WebGL ----------
+  const VS = `
+    precision highp float;
+    attribute vec4 a0; attribute vec4 a1;
+    uniform mat4 uVP; uniform float uT, uDay, uPx, uMe, uMob, uBurst, uFlash;
+    uniform float kS, Op, eB, RB, h0, fl, wa, Rw, Rmax;
+    varying float vA; varying vec3 vC; varying float vHot;
+    void main() {
+      float age = uDay - a1.y;
+      if (age < 0.0) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); gl_PointSize = 0.0; return; }
+      float isBook = mod(a1.w, 2.0), mine = step(1.5, a1.w);
+      float burst = smoothstep(0.0, uBurst, age);                       // las páginas salen del libro al estallar
+      float R = max(0.08, a0.x + a0.z * burst), psi0 = a0.y + a0.w * burst;
+      float bar = Op * uT;                                              // el patrón (barra y brazos) gira entero
+      float rel = psi0 + kS * log(R + 0.6) + Op * uT * 1.4 * exp(-R / 3.0);   // espiral logarítmica; el centro gira algo más
+      float e = eB * exp(-R / RB);                                      // barra: elipse aplastada en el centro
+      vec2 q = vec2(R * cos(rel), R * (1.0 - e) * sin(rel));
+      vec2 p = vec2(q.x * cos(bar) - q.y * sin(bar), q.x * sin(bar) + q.y * cos(bar));
+      float psi = rel;
+      float h = h0 * (1.0 + fl * pow(R / Rmax, 2.0)) * (1.0 + 6.0 * exp(-R / 1.2));   // bulbo grueso y borde con flare
+      float z = a1.x * h * cos(psi * 1.0 + a0.y * 3.0) + wa * pow(max(0.0, R - Rw) / Rmax, 2.0) * sin(atan(p.y, p.x) + 0.6);
+      vec4 clip = uVP * vec4(p.x, z, p.y, 1.0);
+      gl_Position = clip;
+      float persp = clamp(28.0 / clip.w, 0.35, 6.0);
+      float flash = isBook * exp(-age / uFlash);                           // supernova: destello al añadirse
+      vHot = flash;
+      float base = isBook > 0.5 ? a1.z * (0.6 + 0.4 * persp) : (uMob > 0.5 ? 1.3 : 1.0) * clamp(persp * 0.6, 0.8, 1.8);
+      gl_PointSize = uPx * (base + flash * 9.0);
+      float dens = 0.45 + 0.55 * exp(-R / 5.0);
+      vA = isBook > 0.5 ? 0.42 + flash : 0.36 * dens * (0.6 + 0.4 * burst);
+      vec3 c = mix(vec3(1.0, 0.97, 0.92), vec3(0.93, 0.94, 0.96), smoothstep(3.0, 18.0, R));   // casi blanco
+      vC = mix(c, vec3(1.0, 0.31, 0.07), mine * uMe);
+    }`;
+  const FS = `
+    precision mediump float;
+    varying float vA; varying vec3 vC; varying float vHot;
+    void main() {
+      vec2 d = gl_PointCoord - 0.5; float r2 = dot(d, d) * 4.0;
+      if (r2 > 1.0) discard;
+      float a = vA * (exp(-r2 * 5.0) + vHot * 0.3 * (1.0 - r2));
+      gl_FragColor = vec4(mix(vC, vec3(1.0), vHot * 0.6) * a, 1.0);
+    }`;
+  const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; };
+  const prog = gl.createProgram(); gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog); gl.useProgram(prog);
+  const buf = (data, name) => { const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, data.subarray(0, count * 4), gl.STATIC_DRAW); const l = gl.getAttribLocation(prog, name); gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l, 4, gl.FLOAT, false, 0, 0); };
+  buf(A0, 'a0'); buf(A1, 'a1');
+  const U = n => gl.getUniformLocation(prog, n);
+  gl.uniform1f(U('kS'), 1 / Math.tan(DYN.pitch * Math.PI / 180)); gl.uniform1f(U('Op'), DYN.Op);
+  gl.uniform1f(U('eB'), DYN.eBar); gl.uniform1f(U('RB'), DYN.Rbar); gl.uniform1f(U('h0'), DYN.h0);
+  gl.uniform1f(U('fl'), DYN.flare); gl.uniform1f(U('wa'), DYN.warp); gl.uniform1f(U('Rw'), DYN.Rwarp); gl.uniform1f(U('Rmax'), DYN.Rmax);
+  gl.uniform1f(U('uMob'), mobile ? 1 : 0);
+  gl.uniform1f(U('uBurst'), Math.min(1.6, DAYS * .022)); gl.uniform1f(U('uFlash'), Math.min(1.4, DAYS * .02));   // el estallido dura ~1/50 de la línea de tiempo
+  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); gl.disable(gl.DEPTH_TEST);
+
+  // ---------- cámara orbital ----------
+  let W = 0, H = 0, dpr = 1;
+  const cam = { yaw: .5, pitch: .42, dist: 62, ty: .5, tp: .42, td: 62 };
+  function resize() { dpr = Math.min(devicePixelRatio || 1, mobile ? 1.5 : 2); W = Math.round(cv.clientWidth * dpr); H = Math.round(cv.clientHeight * dpr); cv.width = W; cv.height = H; gl.viewport(0, 0, W, H); }
+  addEventListener('resize', resize); resize();
+  function viewProj() {
+    const f = 1 / Math.tan(.42), asp = W / H, n = .5, fa = 400;
+    const cp = Math.cos(cam.pitch), ex = Math.sin(cam.yaw) * cp * cam.dist, ey = Math.sin(cam.pitch) * cam.dist, ez = Math.cos(cam.yaw) * cp * cam.dist;
+    const zx = ex / cam.dist, zy = ey / cam.dist, zz = ez / cam.dist;             // eje z de la cámara (hacia el ojo)
+    let xx = zz, xy = 0, xz = -zx; const xl = Math.hypot(xx, xz) || 1; xx /= xl; xz /= xl;   // x = up × z
+    const yx = zy * xz - zz * xy, yy = zz * xx - zx * xz, yz = zx * xy - zy * xx;
+    const V = [xx, yx, zx, 0, xy, yy, zy, 0, xz, yz, zz, 0, -(xx * ex + xy * ey + xz * ez), -(yx * ex + yy * ey + yz * ez), -(zx * ex + zy * ey + zz * ez), 1];
+    const P = [f / asp, 0, 0, 0, 0, f, 0, 0, 0, 0, (fa + n) / (n - fa), -1, 0, 0, 2 * fa * n / (n - fa), 0];
+    const M = new Float32Array(16);
+    for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) { let s = 0; for (let k = 0; k < 4; k++) s += P[k * 4 + r] * V[c * 4 + k]; M[c * 4 + r] = s; }
+    return M;
+  }
+  const ptrs = new Map(); let pinch0 = null;
+  cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]); cv.classList.add('drag');
+    if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch0 = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), s: cam.td }; } });
+  cv.addEventListener('pointermove', e => {
+    if (!ptrs.has(e.pointerId)) return; const p = ptrs.get(e.pointerId), dx = e.clientX - p[0], dy = e.clientY - p[1]; ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+    if (ptrs.size === 1) { cam.ty -= dx * .006; cam.tp = Math.max(-1.45, Math.min(1.45, cam.tp + dy * .005)); }
+    else if (pinch0) { const [a, b] = [...ptrs.values()]; cam.td = clampD(pinch0.s * pinch0.d / Math.hypot(a[0] - b[0], a[1] - b[1])); }
+  });
+  const up = e => { ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch0 = null; if (!ptrs.size) cv.classList.remove('drag'); };
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  const clampD = d => Math.max(6, Math.min(160, d));
+  cv.addEventListener('wheel', e => { e.preventDefault(); cam.td = clampD(cam.td * Math.exp(e.deltaY * .0012)); }, { passive: false });
+
+  // ---------- controles ----------
+  const timeEl = document.getElementById('time'), dateEl = document.getElementById('date'), playBtn = document.getElementById('play');
+  let day = DAYS, playing = false, me = false;
+  const setPlay = () => { playBtn.textContent = playing ? '❚❚ Pausa' : '▶ Formación'; };
+  timeEl.addEventListener('input', () => { playing = false; setPlay(); day = DAYS * timeEl.value / 1000; });
+  playBtn.onclick = () => { playing = !playing; if (playing && day >= DAYS - .01) day = 0; setPlay(); };
+  const meBtn = document.getElementById('me');
+  meBtn.onclick = () => { me = !me; meBtn.setAttribute('aria-pressed', me); };
+  const infoBtn = document.getElementById('info'), phys = document.getElementById('phys');
+  infoBtn.onclick = () => { phys.hidden = !phys.hidden; infoBtn.setAttribute('aria-pressed', !phys.hidden); };
+
+  function stats() {
+    let rd = 0, bk = 0, pg = 0; for (const e of events) { if (e[0] > day) break; rd += e[3]; bk += e[1]; pg += e[2]; }
+    document.getElementById('sReaders').textContent = num.format(rd);
+    document.getElementById('sBooks').textContent = num.format(bk);
+    document.getElementById('sPages').textContent = num.format(pg);
+    dateEl.textContent = fmt.format(START + day * 864e5);
+  }
+
+  // ---------- bucle ----------
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let last = performance.now(), T = 40, lastStats = -1;
+  function frame(now) {
+    const dt = Math.min(.05, (now - last) / 1000); last = now;
+    if (!reduce) T += dt * 2.2;
+    if (playing) { day += DAYS / 14 * dt; if (day >= DAYS) { day = DAYS; playing = false; setPlay(); } timeEl.value = Math.round(day / DAYS * 1000); }
+    if (!reduce && !ptrs.size) cam.ty += dt * .02;
+    const k = 1 - Math.exp(-dt * 7); cam.yaw += (cam.ty - cam.yaw) * k; cam.pitch += (cam.tp - cam.pitch) * k; cam.dist += (cam.td - cam.dist) * k;
+    gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.uniformMatrix4fv(U('uVP'), false, viewProj());
+    gl.uniform1f(U('uT'), T); gl.uniform1f(U('uDay'), day); gl.uniform1f(U('uPx'), dpr); gl.uniform1f(U('uMe'), me ? 1 : 0);
+    gl.drawArrays(gl.POINTS, 0, count);
+    if (Math.abs(day - lastStats) > .02) { stats(); lastStats = day; }
+    requestAnimationFrame(frame);
+  }
+  stats(); requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

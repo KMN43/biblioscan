@@ -1,16 +1,18 @@
 // Galaxia BiblioScan: guarda el «sol» de cada lector (solo números) y devuelve la galaxia entera.
 //
-//   GET    /galaxy  → { suns: [{ id, pages, joined, updated }], readers, books, pages }
-//   PUT    /sun     { id, key, pages: [312, 180, …] }   crea o actualiza tu sol
-//   DELETE /sun     { id, key }                          quita tu sol
+//   GET    /            → el visualizador (public/index.html)
+//   GET    /galaxy      → { suns: [{ id, books: [[páginas, alta_ms], …], joined }], readers, books, pages }
+//   PUT    /sun         { id, key, books: [[312, 1767225600000], …] }   crea o actualiza tu sol
+//   DELETE /sun         { id, key }                                       quita tu sol
 //
 // id: 16 caracteres hex que genera el móvil. key: secreto de 32 hex que solo conoce ese móvil
 // (aquí se guarda su SHA-256), así nadie más puede cambiar ni borrar tu sol. Sin cuentas ni datos personales.
 
-const MAX_BOOKS = 5000, MAX_PAGES = 20000;
+const MAX_BOOKS = 5000, MAX_PAGES = 20000, T_MIN = Date.UTC(1990, 0, 1);
 const UPDATE_EVERY_S = 30;          // un mismo sol se puede actualizar como mucho cada 30 s
 const NEW_PER_IP_DAY = 10;          // soles nuevos por red y día (contra el relleno masivo)
 const CACHE_S = 60;
+let memo = null;   // copia de la galaxia en la memoria del Worker (la Cache API no funciona en workers.dev)
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -38,42 +40,45 @@ function checkIds(b) {
   return null;
 }
 
-function cleanPages(p) {
-  if (!Array.isArray(p) || p.length < 1 || p.length > MAX_BOOKS) return null;
+// cada libro: [páginas, fecha de alta en ms]. Solo números.
+function cleanBooks(list, now) {
+  if (!Array.isArray(list) || list.length < 1 || list.length > MAX_BOOKS) return null;
   const out = [];
-  for (const v of p) {
-    const n = Math.round(Number(v));
-    if (!Number.isFinite(n) || n < 0 || n > MAX_PAGES) return null;
-    out.push(n);
+  for (const b of list) {
+    if (!Array.isArray(b) || b.length !== 2) return null;
+    const p = Math.round(Number(b[0])), t = Math.round(Number(b[1]));
+    if (!Number.isFinite(p) || p < 0 || p > MAX_PAGES) return null;
+    if (!Number.isFinite(t) || t < T_MIN || t > now + 864e5) return null;
+    out.push([p, t]);
   }
   return out;
 }
 
-async function getGalaxy(env, ctx, req) {
-  const cache = caches.default, cacheKey = new Request(new URL('/galaxy', req.url).toString());
-  const hit = await cache.match(cacheKey);
-  if (hit) return hit;
-  const { results } = await env.DB.prepare('SELECT id, pages, joined, updated FROM suns ORDER BY joined').all();
-  let books = 0, pages = 0;
-  const suns = results.map(r => {
-    const p = JSON.parse(r.pages); books += p.length; pages += p.reduce((a, b) => a + b, 0);
-    return { id: r.id, pages: p, joined: r.joined, updated: r.updated };
-  });
-  const res = json({ suns, readers: suns.length, books, pages }, 200, { 'Cache-Control': `public, max-age=${CACHE_S}` });
-  ctx.waitUntil(cache.put(cacheKey, res.clone()));
-  return res;
+async function getGalaxy(env) {
+  const now = Date.now();
+  if (!memo || now - memo.at > CACHE_S * 1000) {
+    const { results } = await env.DB.prepare('SELECT id, pages, joined FROM suns ORDER BY joined').all();
+    let books = 0, pages = 0;
+    const suns = results.map(r => {
+      const b = JSON.parse(r.pages); books += b.length; pages += b.reduce((a, x) => a + x[0], 0);
+      return { id: r.id, books: b, joined: r.joined };
+    });
+    memo = { at: now, body: JSON.stringify({ suns, readers: suns.length, books, pages, at: now }) };
+  }
+  return new Response(memo.body, { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': `public, max-age=${CACHE_S}`, ...CORS } });
 }
 
 async function putSun(env, req) {
   const b = await readBody(req);
   const bad = checkIds(b); if (bad) return fail(400, bad);
-  const pages = cleanPages(b.pages); if (!pages) return fail(400, 'páginas no válidas');
-  const now = Date.now(), keyHash = await sha256(b.key);
+  const now = Date.now(), pages = cleanBooks(b.books, now); if (!pages) return fail(400, 'libros no válidos');
+  const keyHash = await sha256(b.key);
   const row = await env.DB.prepare('SELECT key_hash, updated FROM suns WHERE id = ?').bind(b.id).first();
   if (row) {
     if (row.key_hash !== keyHash) return fail(403, 'Este sol pertenece a otro móvil');
     if (now - row.updated < UPDATE_EVERY_S * 1000) return fail(429, 'Espera unos segundos antes de volver a actualizar');
     await env.DB.prepare('UPDATE suns SET pages = ?, updated = ? WHERE id = ?').bind(JSON.stringify(pages), now, b.id).run();
+    memo = null;
     return json({ ok: true, created: false });
   }
   // límite de soles nuevos por red y día (se guarda un hash de la IP, nunca la IP)
@@ -85,6 +90,7 @@ async function putSun(env, req) {
     env.DB.prepare('INSERT INTO limits (ip_day, n, day) VALUES (?, 1, ?) ON CONFLICT(ip_day) DO UPDATE SET n = n + 1').bind(ipHash, day),
     env.DB.prepare('DELETE FROM limits WHERE day < ?').bind(day - 1),
   ]);
+  memo = null;
   return json({ ok: true, created: true }, 201);
 }
 
@@ -95,6 +101,7 @@ async function deleteSun(env, req) {
   if (!row) return json({ ok: true, deleted: false });
   if (row.key_hash !== await sha256(b.key)) return fail(403, 'Este sol pertenece a otro móvil');
   await env.DB.prepare('DELETE FROM suns WHERE id = ?').bind(b.id).run();
+  memo = null;
   return json({ ok: true, deleted: true });
 }
 
@@ -103,10 +110,10 @@ export default {
     const { pathname } = new URL(req.url);
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     try {
-      if (pathname === '/galaxy' && req.method === 'GET') return await getGalaxy(env, ctx, req);
+      if (pathname === '/galaxy' && req.method === 'GET') return await getGalaxy(env);
       if (pathname === '/sun' && req.method === 'PUT') return await putSun(env, req);
       if (pathname === '/sun' && req.method === 'DELETE') return await deleteSun(env, req);
-      if (pathname === '/') return json({ name: 'Galaxia BiblioScan', endpoints: ['GET /galaxy', 'PUT /sun', 'DELETE /sun'] });
+      if (env.ASSETS && req.method === 'GET') return env.ASSETS.fetch(req);   // el visualizador
       return fail(404, 'No existe');
     } catch (e) {
       return fail(500, 'Error del servidor');
