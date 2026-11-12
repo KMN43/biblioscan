@@ -210,13 +210,13 @@
       const isbn = cleanIsbn(data.isbn);
       if (![10, 13].includes(isbn.length)) return json({ error: 'ISBN no válido' }, 400);
       if (!String(data.title ?? '').trim()) return json({ error: 'El título es obligatorio' }, 400);
-      const row = upsertBook(data); persist();
+      const row = upsertBook(data); persist(); galSoon();
       if (wlGet(isbn)) { wlDel(isbn); setTimeout(() => window.BIBLIO_MOBILE.toast?.('♡ De tu wishlist a tu biblioteca'), 300); }
       return json({ ok: true, book: row });
     }
     if (path.startsWith('/api/books/') && method === 'DELETE') {
       db.run('DELETE FROM books WHERE isbn = ?', [decodeURIComponent(path.split('/').pop())]);
-      const n = db.getRowsModified(); persist();
+      const n = db.getRowsModified(); persist(); if (n) galSoon();
       return json({ ok: n > 0 });
     }
     if (path === '/api/library' && method === 'GET') {
@@ -294,8 +294,10 @@
         const books = q('SELECT * FROM books');
         const kv = q("SELECT value FROM kv WHERE key = 'library'")[0];
         const wishlist = q('SELECT * FROM wishlist');
+        const gk = Object.fromEntries(q("SELECT key, value FROM kv WHERE key IN ('galaxy_id', 'galaxy_key', 'galaxy_on')").map(r => [r.key, r.value]));
+        const galaxy = gk.galaxy_on === '1' && /^[0-9a-f]{16}$/.test(gk.galaxy_id || '') && /^[0-9a-f]{32}$/.test(gk.galaxy_key || '') ? { id: gk.galaxy_id, key: gk.galaxy_key } : null;
         if (!books.length && !kv && !wishlist.length) throw new Error('El archivo no parece una base de datos de BiblioScan.');
-        return { books, library: kv ? JSON.parse(kv.value) : null, wishlist };
+        return { books, library: kv ? JSON.parse(kv.value) : null, wishlist, galaxy };
       } finally { src.close(); }
     }
     let data;
@@ -319,8 +321,9 @@
       if (replace && imp.wishlist) db.run('DELETE FROM wishlist');
       const owned = new Set(rows('SELECT isbn FROM books').map(r => r.isbn));
       for (const w of imp.wishlist || []) if ([10, 13].includes(cleanIsbn(w.isbn).length) && !owned.has(cleanIsbn(w.isbn))) wlPut(w, true);
+      if (replace && imp.galaxy && !kvGet('galaxy_id')) { kvSet('galaxy_id', imp.galaxy.id); kvSet('galaxy_key', imp.galaxy.key); kvSet('galaxy_on', '1'); }
       db.run('COMMIT');
-      await flush();
+      await flush(); galSoon(5);
       return n;
     } catch (e) { db.run('ROLLBACK'); throw e; }
   }
@@ -334,6 +337,7 @@
     feed: '<rect x="6" y="3.5" width="12" height="17" rx="2.5"/><path d="M9 14.5h6M9 17h4"/>',
     image: '<rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M4.5 17.5l4.5-4.5 3.5 3.5 2.5-2.5 4.5 4.5"/>',
     dots: '<circle cx="5.5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="18.5" cy="12" r="1.2" fill="currentColor"/>',
+    star: '<path d="M12 3.2l2.6 5.5 6 .7-4.4 4.1 1.1 6L12 16.6l-5.3 2.9 1.1-6-4.4-4.1 6-.7z"/>',
     eye: '<path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/>',
     edit: '<path d="M4 20h4L19.5 8.5l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/>',
     trash: '<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/>',
@@ -393,6 +397,11 @@
             <div class="infoh"><div class="ilogo">B/S</div><div><b>BiblioScan</b><span class="mono-caps">Versión ${escH(window.BIBLIO_VERSION || '—')}</span></div></div>
             <a class="ilink mono-caps" href="https://github.com/KMN43/biblioscan" target="_blank" rel="noopener">${svg('ext')}<span>github.com/KMN43/biblioscan</span></a>
             <div class="btns iupd">${ib('updCheck', 'rotate', 'Buscar actualizaciones')}<button id="updGet" class="ibtn primary" hidden aria-label="Descargar e instalar" title="Descargar e instalar">${svg('download')}</button><span id="updMsg" class="mono-caps"></span></div>
+            <div class="mono-caps lbl">Galaxia de lectores</div>
+            <p>Únete a la galaxia común de BiblioScan: cada página de tu biblioteca es una estrella y cada libro, una estrella grande.
+               Solo se sube el número de páginas de cada libro y cuándo lo añadiste; nunca títulos, autores ni ISBN.</p>
+            <div class="btns">${ib('galJoin', 'star', 'Unirme a la galaxia', 'data-pri')}${ib('galSee', 'eye', 'Ver la galaxia')}${ib('galLeave', 'trash', 'Quitar mi sol de la galaxia')}</div>
+            <p id="galMsg" class="hint mono-caps"></p>
             <div class="mono-caps lbl">Compartir BiblioScan</div>
             <div class="btns">${ib('shareQR', 'qr', 'Mostrar el QR para descargar la app', 'data-pri')}${ib('shareLink', 'share', 'Enviar el enlace de descarga')}</div>
             <div id="qrBox" class="qrbox" hidden></div>
@@ -1288,7 +1297,7 @@
   }
   function stopSun() { SUN.on = false; cancelAnimationFrame(SUN.raf); }
   addEventListener('resize', () => SUN.on && SUN.resize?.());
-  document.addEventListener('visibilitychange', () => { if (document.hidden) stopSun(); else if (homeOn && isPhone()) startSun(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) stopSun(); else if (homeOn && isPhone() && !GALX.open) startSun(); });
 
   // --- configurador de la Home: lo básico para personalizar el sol (se guarda en este móvil) ---
   const THEMES = {
@@ -1337,6 +1346,101 @@
     $id('sunCfgBtn').onclick = () => { paint(); sheet.hidden = false; };
   }
 
+  // ============================================================ GALAXIA BIBLIOSCAN (comunidad)
+  // Tu sol se sube a una galaxia común: solo números (páginas de cada libro y cuándo lo añadiste), nunca títulos ni ISBN.
+  // Servidor: Cloudflare Worker + D1 (carpeta galaxia/ del repositorio). Cada móvil tiene un id y una clave propios en la tabla kv.
+  const GALAXY_URL = 'https://biblioscan-galaxia.biblioscan-galaxia.workers.dev';
+  const GALX = { open: false, timer: 0 };
+  const kvGet = k => { try { return rows('SELECT value FROM kv WHERE key = ?', [k])[0]?.value ?? null; } catch { return null; } };
+  const kvSet = (k, v) => {
+    if (v == null) db.run('DELETE FROM kv WHERE key = ?', [k]);
+    else db.run('INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value', [k, String(v)]);
+  };
+  const randHex = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => b.toString(16).padStart(2, '0')).join('');
+  function galIdentity(create) {
+    let id = kvGet('galaxy_id'), key = kvGet('galaxy_key');
+    if ((!id || !key) && create) { id = randHex(8); key = randHex(16); kvSet('galaxy_id', id); kvSet('galaxy_key', key); persist(); }
+    return id && key ? { id, key } : null;
+  }
+  const galOn = () => kvGet('galaxy_on') === '1';
+  function galBooks() {
+    const now = Date.now();
+    return rows('SELECT pages, created_at FROM books').slice(0, 5000).map(b => {
+      const t = Date.parse(String(b.created_at || '').replace(' ', 'T'));
+      return [Math.max(0, Math.min(20000, parseInt(b.pages, 10) || 0)), Number.isFinite(t) && t > 631152000000 ? Math.min(t, now) : now];
+    });
+  }
+  // sube o actualiza tu sol; si no ha cambiado nada desde la última vez, no hace nada
+  async function galPut(force) {
+    await ready;
+    const books = galBooks();
+    if (!books.length) throw new Error('Añade algún libro antes de unirte');
+    const body = { ...galIdentity(true), books }, sig = String(hash(JSON.stringify(books)));
+    if (!force && galOn() && kvGet('galaxy_sig') === sig) return 'igual';
+    const r = await fetch(GALAXY_URL + '/sun', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 429 && galOn()) { galSoon(45); return 'luego'; }
+    if (!r.ok) throw new Error(d.error || `El servidor respondió ${r.status}`);
+    kvSet('galaxy_on', '1'); kvSet('galaxy_sig', sig); kvSet('galaxy_at', Date.now()); persist();
+    return d.created ? 'nuevo' : 'actualizado';
+  }
+  function galSoon(s = 40) { clearTimeout(GALX.timer); GALX.timer = setTimeout(() => { if (galOn()) galPut().then(galInfo).catch(() => {}); }, s * 1000); }
+  async function galLeave() {
+    await ready;
+    const me = galIdentity(false);
+    if (me) {
+      const r = await fetch(GALAXY_URL + '/sun', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(me) });
+      if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.error || `El servidor respondió ${r.status}`); }
+    }
+    kvSet('galaxy_on', null); kvSet('galaxy_sig', null); kvSet('galaxy_at', null); persist();
+  }
+  const ago = ms => { const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? 'ahora mismo' : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} días`; };
+  function galInfo(note) {
+    const msg = $id('galMsg'); if (!msg) return;
+    const on = galOn(), at = +kvGet('galaxy_at');
+    msg.textContent = typeof note === 'string' && note.length > 12 ? note : on ? `Tu sol está en la galaxia · actualizado ${at ? ago(at) : '—'}` : 'Tu sol no está en la galaxia';
+    $id('galJoin').hidden = on; $id('galLeave').hidden = !on;
+  }
+  function galFrameUrl() { const me = galOn() ? galIdentity(false) : null; return `${GALAXY_URL}/?app=1${me ? '&me=' + me.id : ''}`; }
+  function openGalaxy() {
+    if (!$id('galView')) return;
+    stopSun(); GALX.open = true;
+    $id('galFrame').src = galFrameUrl();
+    $id('galView').hidden = false; $id('galBtn').hidden = true; $id('sunCfgBtn').hidden = true;
+  }
+  function closeGalaxy() {
+    if (!$id('galView') || $id('galView').hidden) return;
+    GALX.open = false; $id('galView').hidden = true; $id('galFrame').src = 'about:blank';
+    $id('galBtn').hidden = false; $id('sunCfgBtn').hidden = false;
+    if (homeOn) startSun();
+  }
+  function buildGalaxy() {
+    const hv = $id('homeView'); if (!hv || $id('galBtn')) return;
+    hv.insertAdjacentHTML('beforeend', `${ib('galBtn', 'star', 'Galaxia de lectores')}
+      <div id="galView" class="galv" hidden><iframe id="galFrame" title="Galaxia BiblioScan" src="about:blank"></iframe>${ib('galBack', 'prev', 'Volver a mi sol')}</div>`);
+    $id('galBtn').onclick = openGalaxy;
+    $id('galBack').onclick = closeGalaxy;
+    ['tabScan', 'tabCat', 'tabLib'].forEach(id => $id(id)?.addEventListener('click', closeGalaxy));
+  }
+  // sección de Info
+  function hookGalaxyInfo() {
+    const msg = $id('galMsg'); if (!msg) return;
+    const run = async (fn, busyTxt) => {
+      ['galJoin', 'galLeave', 'galSee'].forEach(id => { $id(id).disabled = true; });
+      msg.textContent = busyTxt;
+      try { await fn(); } catch (e) { galInfo(e?.message === 'Failed to fetch' ? 'Sin conexión con la galaxia. Inténtalo luego.' : 'No se pudo: ' + (e?.message || e)); }
+      ['galJoin', 'galLeave', 'galSee'].forEach(id => { $id(id).disabled = false; });
+    };
+    $id('galJoin').onclick = () => run(async () => { await galPut(true); galInfo(); mtoast('☆ Tu sol ya está en la galaxia'); }, 'Subiendo tu sol…');
+    $id('galLeave').onclick = () => {
+      if ($id('galLeave').dataset.sure !== '1') { $id('galLeave').dataset.sure = '1'; msg.textContent = 'Toca otra vez para quitar tu sol de la galaxia'; setTimeout(() => { delete $id('galLeave').dataset.sure; galInfo(); }, 4000); return; }
+      delete $id('galLeave').dataset.sure;
+      run(async () => { await galLeave(); galInfo(); mtoast('Tu sol ya no está en la galaxia'); }, 'Quitando tu sol…');
+    };
+    $id('galSee').onclick = () => { $id('dataClose').click(); if (isPhone()) { showHome(); openGalaxy(); } else window.open(galFrameUrl(), '_blank'); };
+    $id('tabData').addEventListener('click', () => ready.then(galInfo));
+  }
+
   // ============================================================ compartir la app (pestaña Info)
   const APP_URL = 'https://github.com/KMN43/biblioscan/releases/latest/download/BiblioScan.apk';
   function showShareQR() {
@@ -1365,7 +1469,7 @@
     history.replaceState(null, '', location.pathname);
     cameraFor(false); renderHome();
   }
-  function renderHome() { if (!$id('homeView').hidden) startSun(); }
+  function renderHome() { if (!$id('homeView').hidden && !GALX.open) startSun(); }
   function buildNav() {
     const nav = document.querySelector('.tabs');
     if (!nav || $id('tabHome')) return;
@@ -1374,7 +1478,7 @@
     ['tabLib', 'tabData', 'tabHome', 'tabScan', 'tabCat'].forEach(id => $id(id) && nav.append($id(id)));
     $id('libView').insertAdjacentHTML('afterend', `
       <div id="homeView" class="homev" hidden><canvas id="sunCanvas" aria-label="Tu biblioteca como un sol de páginas"></canvas></div>`);
-    buildSunConfig();
+    buildSunConfig(); buildGalaxy();
     $id('tabHome').onclick = showHome;
     ['tabScan', 'tabCat', 'tabLib'].forEach(id => $id(id).addEventListener('click', () => {   // después del setTab de index.html
       homeOn = false; $id('homeView').hidden = true; $id('tabHome').classList.remove('active'); stopSun();
@@ -1386,8 +1490,9 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     window.BIBLIO_MOBILE.toast = mtoast;
-    iconizeButtons(); buildPanel(); buildMobileCatalog(); buildShelfBrowser();
+    iconizeButtons(); buildPanel(); hookGalaxyInfo(); buildMobileCatalog(); buildShelfBrowser();
     if (isPhone()) { buildScan(); buildLook(); hookConfirm(); }
     buildNav(); setTimeout(checkUpdate, 2500);
+    ready.then(() => { if (galOn()) galSoon(8); });   // al abrir, por si cambió algo sin conexión
   });
 })();

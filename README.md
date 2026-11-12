@@ -167,6 +167,7 @@ La misma app, adaptada a la pantalla del móvil. **Todo se guarda en el propio t
 - **Cinco pestañas abajo**: Biblioteca · Info · **Home** · Scan · Catálogo. La app arranca en Home y la cámara solo se enciende al escanear. Los botones son solo iconos.
 - **Home**: tu biblioteca como un sol de páginas. Hay un punto por página (hasta 36 000) y cada libro es un pozo de gravedad invisible sobre la esfera, con sus páginas girando a su alrededor y arcos de plasma hacia otros libros. Los enlaces entre libros se reescriben poco a poco con una regla inspirada en Wolfram Physics. La forma sale de una semilla fija calculada con el número de libros y de páginas: la misma biblioteca da siempre el mismo sol. Se gira con el dedo, con inercia. El icono de ajustes de la Home abre un **configurador** con tres temas de color (Sol, Noche y Papel) y los controles básicos: densidad, tamaño, velocidad de giro, plasma, remolino, brillo y resplandor. Se guarda en el propio móvil.
 - **Compartir** (pestaña Info): muestra en pantalla el QR para descargar la app o envía el enlace.
+- **Galaxia de lectores** (pestaña Info → *Unirme a la galaxia*, y la estrella de la Home): tu biblioteca se suma a una galaxia común de dos brazos en la que cada página es una estrella y cada libro, una estrella grande que estalla como una supernova al añadirse. Es voluntario. Solo se sube el número de páginas de cada libro y cuándo lo añadiste, nunca títulos, autores ni ISBN. Tu sol se actualiza solo cuando añades o quitas libros, y *Quitar mi sol* lo borra del servidor. Si cambias de móvil, *Importar → Reemplazar todo* con tu `.db` conserva tu sol. La galaxia también se ve en el navegador: <https://biblioscan-galaxia.biblioscan-galaxia.workers.dev>.
 - **Scan**: dos círculos sobre fondo naranja. **«+» añade** libros a tu biblioteca y **la lupa consulta** un libro sin guardarlo: te dice si ya lo tienes (y en qué balda) o te deja guardarlo en tu **wishlist ♡**. El visor de la cámara es cuadrado y ocupa todo el ancho.
 - **Wishlist**: si luego añades con «+» un libro de tu wishlist, la app te avisa y lo pasa a tu biblioteca. En el catálogo, el filtro **Biblioteca / Wishlist** cambia entre las dos listas. Se guarda en una tabla aparte del mismo `.db`, así que el archivo sigue funcionando en el PC.
 - **Catálogo**: dos vistas, que se alternan con el icono de la cabecera.
@@ -286,6 +287,7 @@ biblioscan/
 ├── build_exe.py        # Genera BiblioScan.exe con PyInstaller
 ├── mcp_biblioteca.py   # Conector MCP de solo lectura para Claude
 ├── mobile/             # App de Android (Capacitor): capa local SQLite, estilos de móvil y proyecto Android
+├── galaxia/            # Galaxia de lectores: servidor gratuito en Cloudflare (Worker + D1) y visualizador
 ├── biblioscan.ico      # Icono de la app
 ├── requirements.txt    # Dependencias de la versión de escritorio
 └── docs/img/           # Capturas de esta guía

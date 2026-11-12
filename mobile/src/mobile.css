@@ -322,3 +322,12 @@
 .qrsvg svg { width: min(62vw, 240px); height: auto; display: block; margin: 0 auto; }
 .qrbox p { margin: 10px 0 0; color: var(--muted); }
 .qrbox .qrurl { font-size: 10px; word-break: break-all; color: var(--ink); }
+
+/* ---- galaxia de lectores (Home) ---- */
+#galBtn { position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); left: 14px; z-index: 2;
+          border-color: rgba(18,18,18,.55); background: rgba(236,235,230,.18); }
+#galBtn[hidden], #sunCfgBtn[hidden], #galJoin[hidden], #galLeave[hidden] { display: none; }
+.galv { position: absolute; inset: 0; z-index: 3; background: #000; }
+.galv[hidden] { display: none; }
+.galv iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; background: #000; }
+#galBack { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); left: 12px; z-index: 2; background: rgba(236,235,230,.85); border-color: transparent; }
