@@ -9,15 +9,15 @@
 <style>
 /* Una pantalla: la galaxia en 3D a sangre, cabecera arriba y línea de tiempo abajo, flotando sobre el negro */
 :root {
-  --sky: #000000;        /* espacio */
-  --ink: #ecebe8;        /* texto, blanco de estrella */
-  --muted: #8d8a85;
-  --you: #ff4f12;        /* naranja BiblioScan: solo para «mis páginas» */
-  --glass: rgba(14, 14, 14, .72);
-  --line: rgba(236, 235, 232, .16);
+  --sky: #ff4f12;        /* tema Sol: el naranja de BiblioScan */
+  --ink: #121212;        /* tinta */
+  --muted: rgba(18, 18, 18, .62);
+  --you: #121212;        /* «mis páginas» */
+  --glass: rgba(236, 235, 230, .5);
+  --line: rgba(18, 18, 18, .22);
   --display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
-  color-scheme: dark;
+  color-scheme: light;
 }
 html, body { height: 100%; margin: 0; }
 :root { padding-top: env(safe-area-inset-top, 0px); }
@@ -42,13 +42,14 @@ button { font: 600 11px var(--mono); letter-spacing: .1em; text-transform: upper
 button:hover { border-color: var(--ink); }
 button[aria-pressed="true"] { border-color: var(--you); color: var(--you); }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-button.pri { background: var(--ink); border-color: var(--ink); color: #000; }
+button.pri { background: var(--ink); border-color: var(--ink); color: #fff4e1; }
+button[aria-pressed="true"] { background: var(--ink); color: #fff4e1; }
 input[type=range] { flex: 1; min-width: 0; accent-color: var(--ink); }
 #date { font-variant-numeric: tabular-nums; font-size: 12px; min-width: 7.5em; text-align: right; }
 .hint { text-align: center; font-size: 10px; color: var(--muted); letter-spacing: .08em; }
 .phys { position: fixed; left: max(16px, env(safe-area-inset-left, 0px)); top: calc(88px + env(safe-area-inset-top, 0px)); width: min(330px, calc(100% - 32px)); background: var(--glass); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; backdrop-filter: blur(8px); box-sizing: border-box; font-size: 11.5px; line-height: 1.55; max-height: calc(100% - 230px); overflow: auto; }
 .phys h2 { font-family: var(--display); font-weight: 500; font-size: 16px; margin: 0 0 8px; }
-.phys p { margin: 0 0 8px; color: #c9c7c2; }
+.phys p { margin: 0 0 8px; color: var(--ink); }
 .phys code { font-family: var(--mono); color: var(--ink); }
 .phys dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 8px 0 0; font-variant-numeric: tabular-nums; }
 .phys dt { color: var(--muted); } .phys dd { margin: 0; text-align: right; }
@@ -71,7 +72,7 @@ input[type=range] { flex: 1; min-width: 0; accent-color: var(--ink); }
 <aside class="phys" id="phys" hidden>
   <h2>Cómo se mueve</h2>
   <p>Cada <b>página</b> es una estrella y cada <b>libro</b> es una estrella grande. Al añadirlo estalla como una supernova y sus páginas se reparten a su alrededor. La rotación diferencial las estira después en corrientes.</p>
-  <p>Los dos brazos siguen una espiral logarítmica, <code>θ = θ₀ + ln R / tan i</code>, con una inclinación de brazo <code>i = 21°</code>, y giran juntos alrededor de una barra central.</p>
+  <p>Los dos brazos siguen una espiral logarítmica, <code>θ = θ₀ + ln R / tan i</code>, con una inclinación de brazo <code>i = 14°</code>, y giran juntos alrededor de un núcleo redondo.</p>
   <p>La galaxia crece de dentro hacia fuera: los primeros lectores forman el núcleo y los nuevos alargan los brazos.</p>
 </aside>
 <footer class="bottom">
@@ -105,7 +106,12 @@ input[type=range] { flex: 1; min-width: 0; accent-color: var(--ink); }
   const num = new Intl.NumberFormat('es-ES');
 
   // ---------- dinámica (unidades: kpc y unidades de tiempo del modelo) ----------
-  const DYN = { pitch: 21, Op: .045, eBar: .5, Rbar: 1.6, Rmax: 30, h0: .05, flare: 1.2, warp: .35, Rwarp: 20 };
+  // configuración elegida con el Afinador de la Galaxia (2026-11-12)
+  const CFG = { bg: '#ff4f12', star: '#fff4e1', book: '#ffffff', me: '#121212', additive: false,
+    pitch: 14, armWidth: .22, coreSpread: 5, interarm: .08, rings: 48, diskScale: 4.3, bar: .2, barFlat: 0,
+    thick: .3, flare: 3.3, warp: 4, spin: .045, coreSpin: .65, autoRotate: 0,
+    pageSize: 3, pageGlow: 1, bookSize: 3, bookGlow: 1, nova: 23.5, burst: 2, adaptive: true, camTilt: .48, camDist: .7835 };
+  const DYN = { pitch: CFG.pitch, Op: CFG.spin, eBar: CFG.barFlat, Rbar: CFG.bar, Rmax: 30, h0: CFG.thick, flare: CFG.flare, warp: CFG.warp, Rwarp: 20 };
 
   // ---------- los soles de la galaxia: solo números (páginas de cada libro y cuándo se añadió) ----------
   let data;
@@ -137,9 +143,9 @@ input[type=range] { flex: 1; min-width: 0; accent-color: var(--ink); }
     events.push([rd.joined, 0, 0, 1]);
     for (const bk of rd.books) {
       // con pocos lectores, sus libros se reparten por todo el disco (perfil exponencial); con muchos, cada uno en su anillo
-      let Rb = R() < Math.min(1, NREAD / 30) ? Math.abs(band + gauss() * (1.5 + band * .3)) : Math.min(29, -6.5 * Math.log(1 - R() * .985));
+      let Rb = R() < Math.min(1, NREAD / CFG.rings) ? Math.abs(band + gauss() * (1.5 + band * .3)) : Math.min(29, -CFG.diskScale * Math.log(1 - R() * .985));
       if (Rb < .25) Rb = .25 + R() * .5;
-      const inter = R() < .14, sig = .2 + 2.2 * Math.exp(-Rb / 2.2);
+      const inter = R() < CFG.interarm, sig = CFG.armWidth + CFG.coreSpread * Math.exp(-Rb / 2.2);
       const pb = inter ? R() * Math.PI * 2 : (R() < .5 ? 0 : Math.PI) + gauss() * sig, zb = gauss() * .5;
       const put = (dR, dp, z, size, flags) => { const k = count * 4; A0[k] = Rb; A0[k + 1] = pb; A0[k + 2] = dR; A0[k + 3] = dp; A1[k] = z; A1[k + 1] = bk.t; A1[k + 2] = size; A1[k + 3] = flags; count++; };
       put(0, 0, zb * .4, .9 + Math.sqrt(bk.pages) / 24, 1 + mine);
@@ -154,7 +160,8 @@ input[type=range] { flex: 1; min-width: 0; accent-color: var(--ink); }
   const VS = `
     precision highp float;
     attribute vec4 a0; attribute vec4 a1;
-    uniform mat4 uVP; uniform float uT, uDay, uPx, uMe, uMob, uBurst, uFlash, uGain, uSize;
+    uniform mat4 uVP; uniform float uT, uDay, uPx, uMe, uMob, uBurst, uFlash, uGain, uSize, cS, pS, pG, bS, bG, nova;
+    uniform vec3 cStar, cBook, cMe;
     uniform float kS, Op, eB, RB, h0, fl, wa, Rw, Rmax;
     varying float vA; varying vec3 vC; varying float vHot;
     void main() {
@@ -164,7 +171,7 @@ input[type=range] { flex: 1; min-width: 0; accent-color: var(--ink); }
       float burst = smoothstep(0.0, uBurst, age);                       // las páginas salen del libro al estallar
       float R = max(0.08, a0.x + a0.z * burst), psi0 = a0.y + a0.w * burst;
       float bar = Op * uT;                                              // el patrón (barra y brazos) gira entero
-      float rel = psi0 + kS * log(R + 0.6) + Op * uT * 1.4 * exp(-R / 3.0);   // espiral logarítmica; el centro gira algo más
+      float rel = psi0 + kS * log(R + 0.6) + Op * uT * cS * exp(-R / 3.0);   // espiral logarítmica; el centro gira algo más
       float e = eB * exp(-R / RB);                                      // barra: elipse aplastada en el centro
       vec2 q = vec2(R * cos(rel), R * (1.0 - e) * sin(rel));
       vec2 p = vec2(q.x * cos(bar) - q.y * sin(bar), q.x * sin(bar) + q.y * cos(bar));
@@ -176,12 +183,11 @@ input[type=range] { flex: 1; min-width: 0; accent-color: var(--ink); }
       float persp = clamp(28.0 / clip.w, 0.35, 6.0);
       float flash = isBook * exp(-age / uFlash);                           // supernova: destello al añadirse
       vHot = flash;
-      float base = isBook > 0.5 ? a1.z * (0.6 + 0.4 * persp) : (uMob > 0.5 ? 1.3 : 1.0) * uSize * clamp(persp * 0.6, 0.8, 1.8);
-      gl_PointSize = uPx * (base + flash * 9.0);
+      float base = isBook > 0.5 ? a1.z * bS * (0.6 + 0.4 * persp) : pS * (uMob > 0.5 ? 1.3 : 1.0) * uSize * clamp(persp * 0.6, 0.8, 1.8);
+      gl_PointSize = uPx * (base + flash * nova);
       float dens = 0.45 + 0.55 * exp(-R / 5.0);
-      vA = isBook > 0.5 ? min(1.0, 0.42 * uGain) + flash : min(1.0, 0.36 * uGain * dens) * (0.6 + 0.4 * burst);
-      vec3 c = mix(vec3(1.0, 0.97, 0.92), vec3(0.93, 0.94, 0.96), smoothstep(3.0, 18.0, R));   // casi blanco
-      vC = mix(c, vec3(1.0, 0.31, 0.07), mine * uMe);
+      vA = isBook > 0.5 ? min(1.0, bG * uGain) + flash : min(1.0, pG * uGain * dens) * (0.6 + 0.4 * burst);
+      vC = mix(isBook > 0.5 ? cBook : cStar, cMe, mine * uMe);
     }`;
   const FS = `
     precision mediump float;
@@ -190,7 +196,8 @@ input[type=range] { flex: 1; min-width: 0; accent-color: var(--ink); }
       vec2 d = gl_PointCoord - 0.5; float r2 = dot(d, d) * 4.0;
       if (r2 > 1.0) discard;
       float a = vA * (exp(-r2 * 5.0) + vHot * 0.3 * (1.0 - r2));
-      gl_FragColor = vec4(mix(vC, vec3(1.0), vHot * 0.6) * a, 1.0);
+      a = clamp(a, 0.0, 1.0);
+      gl_FragColor = vec4(vC * a, a);
     }`;
   const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; };
   const prog = gl.createProgram(); gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog); gl.useProgram(prog);
@@ -204,14 +211,18 @@ input[type=range] { flex: 1; min-width: 0; accent-color: var(--ink); }
   // pocas estrellas → cada una más grande y brillante (con un millón vuelve al aspecto de la referencia)
   const gain = Math.max(1, Math.min(4, Math.sqrt(500000 / Math.max(1, count))));
   gl.uniform1f(U('uGain'), gain); gl.uniform1f(U('uSize'), Math.min(2.2, Math.sqrt(gain)));
-  gl.uniform1f(U('uBurst'), Math.min(1.6, DAYS * .022)); gl.uniform1f(U('uFlash'), Math.min(1.4, DAYS * .02));   // el estallido dura ~1/50 de la línea de tiempo
-  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); gl.disable(gl.DEPTH_TEST);
+  gl.uniform1f(U('uBurst'), Math.min(1.6, DAYS * .022) * CFG.burst); gl.uniform1f(U('uFlash'), Math.min(1.4, DAYS * .02) * CFG.burst);   // el estallido dura ~1/50 de la línea de tiempo
+  gl.enable(gl.BLEND); CFG.additive ? gl.blendFunc(gl.ONE, gl.ONE) : gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.disable(gl.DEPTH_TEST);
+  const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255), BG = rgb(CFG.bg);
+  gl.uniform1f(U('cS'), CFG.coreSpin); gl.uniform1f(U('pS'), CFG.pageSize); gl.uniform1f(U('pG'), CFG.pageGlow);
+  gl.uniform1f(U('bS'), CFG.bookSize); gl.uniform1f(U('bG'), CFG.bookGlow); gl.uniform1f(U('nova'), CFG.nova);
+  gl.uniform3fv(U('cStar'), rgb(CFG.star)); gl.uniform3fv(U('cBook'), rgb(CFG.book)); gl.uniform3fv(U('cMe'), rgb(CFG.me));
 
   // ---------- cámara orbital ----------
   let W = 0, H = 0, dpr = 1;
-  const cam = { yaw: .5, pitch: .42, dist: 62, ty: .5, tp: .42, td: 62 };
+  const cam = { yaw: .5, pitch: CFG.camTilt, dist: 62, ty: .5, tp: CFG.camTilt, td: 62 };
   function resize() { dpr = Math.min(devicePixelRatio || 1, mobile ? 1.5 : 2); W = Math.round(cv.clientWidth * dpr); H = Math.round(cv.clientHeight * dpr); cv.width = W; cv.height = H; gl.viewport(0, 0, W, H);
-    const fitD = Math.min(150, 62 * Math.max(1, .95 / (W / H))); if (!cam.fit || Math.abs(cam.td - cam.fit) < 1) cam.td = cam.dist = fitD; cam.fit = fitD; }   // en vertical, más lejos para que quepa
+    const fitD = Math.min(150, 62 * Math.max(1, .95 / (W / H))) * CFG.camDist; if (!cam.fit || Math.abs(cam.td - cam.fit) < 1) cam.td = cam.dist = fitD; cam.fit = fitD; }   // en vertical, más lejos para que quepa
   addEventListener('resize', resize); resize();
   function viewProj() {
     const f = 1 / Math.tan(.42), asp = W / H, n = .5, fa = 400;
@@ -264,9 +275,9 @@ input[type=range] { flex: 1; min-width: 0; accent-color: var(--ink); }
     const dt = Math.min(.05, (now - last) / 1000); last = now;
     if (!reduce) T += dt * 2.2;
     if (playing) { day += DAYS / 14 * dt; if (day >= DAYS) { day = DAYS; playing = false; setPlay(); } timeEl.value = Math.round(day / DAYS * 1000); }
-    if (!reduce && !ptrs.size) cam.ty += dt * .02;
+    if (!reduce && !ptrs.size) cam.ty += dt * CFG.autoRotate;
     const k = 1 - Math.exp(-dt * 7); cam.yaw += (cam.ty - cam.yaw) * k; cam.pitch += (cam.tp - cam.pitch) * k; cam.dist += (cam.td - cam.dist) * k;
-    gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.clearColor(BG[0], BG[1], BG[2], 1); gl.clear(gl.COLOR_BUFFER_BIT);
     gl.uniformMatrix4fv(U('uVP'), false, viewProj());
     gl.uniform1f(U('uT'), T); gl.uniform1f(U('uDay'), day); gl.uniform1f(U('uPx'), dpr); gl.uniform1f(U('uMe'), me ? 1 : 0);
     gl.drawArrays(gl.POINTS, 0, count);
