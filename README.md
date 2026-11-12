@@ -1,3 +1,5 @@
+<img src="docs/img/logo.png" alt="Logo de BiblioScan: un libro abierto con una estrella" width="96">
+
 # BIBLIO / SCAN
 
 **Catálogo óptico para tu biblioteca personal.** Apunta la webcam al código de barras de un libro y BiblioScan lee el ISBN, busca la ficha en **Google Books**, **todostuslibros** (catálogo de las librerías españolas) y **Open Library**, y la guarda en una base de datos SQLite local cuando la confirmas. Después puedes explorar el catálogo, filtrarlo y colocar cada libro en tus estanterías reales.
@@ -288,6 +290,7 @@ biblioscan/
 ├── mcp_biblioteca.py   # Conector MCP de solo lectura para Claude
 ├── mobile/             # App de Android (Capacitor): capa local SQLite, estilos de móvil y proyecto Android
 ├── galaxia/            # Galaxia de lectores: servidor gratuito en Cloudflare (Worker + D1) y visualizador
+├── logo.py            # El logo (libro + estrella): genera el SVG, el icono del .exe y los de Android
 ├── biblioscan.ico      # Icono de la app
 ├── requirements.txt    # Dependencias de la versión de escritorio
 └── docs/img/           # Capturas de esta guía

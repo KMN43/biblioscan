@@ -394,7 +394,7 @@
         <div class="mcard datacard">
           <div class="bar mono-caps"><span>Información</span><span id="dataCount"></span></div>
           <div class="datab">
-            <div class="infoh"><div class="ilogo">B/S</div><div><b>BiblioScan</b><span class="mono-caps">Versión ${escH(window.BIBLIO_VERSION || '—')}</span></div></div>
+            <div class="infoh"><div class="ilogo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="-50 -32 100 66" role="img" aria-label="BiblioScan"><path fill="currentColor" fill-rule="evenodd" d="M-46 30 L-46 -28 L-27 -28 A24 24 0 0 1 -3 -4 L0 1 L3 -4 A24 24 0 0 1 27 -28 L46 -28 L46 30 Z M0.00 -9.70 Q2.21 6.79 18.70 9.00 Q2.21 11.21 0.00 27.70 Q-2.21 11.21 -18.70 9.00 Q-2.21 6.79 0.00 -9.70 Z"/></svg></div><div><b>BiblioScan</b><span class="mono-caps">Versión ${escH(window.BIBLIO_VERSION || '—')}</span></div></div>
             <a class="ilink mono-caps" href="https://github.com/KMN43/biblioscan" target="_blank" rel="noopener">${svg('ext')}<span>github.com/KMN43/biblioscan</span></a>
             <div class="btns iupd">${ib('updCheck', 'rotate', 'Buscar actualizaciones')}<button id="updGet" class="ibtn primary" hidden aria-label="Descargar e instalar" title="Descargar e instalar">${svg('download')}</button><span id="updMsg" class="mono-caps"></span></div>
             <div class="mono-caps lbl">Galaxia de lectores</div>

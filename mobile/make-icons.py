@@ -1,42 +1,24 @@
-"""Genera los iconos y la pantalla de arranque de Android con el mismo diseño que biblioscan.ico.
+"""Genera los iconos y la pantalla de arranque de Android con el logo de BiblioScan (logo.py, en la raíz).
     python make-icons.py
 """
 import glob
 import os
-from PIL import Image, ImageDraw, ImageFont
+import sys
+from PIL import Image
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from logo import render  # noqa: E402
 
 RES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "android", "app", "src", "main", "res")
 ORANGE, INK, PAPER = "#ff4f12", "#121212", "#ecebe6"
 
 
-def font(px):
-    try:
-        return ImageFont.truetype("arialbd.ttf", px)
-    except OSError:
-        return ImageFont.load_default()
-
-
-def mark(d, cx, cy, s, color):
-    """'B/S' + la barrita de 'código de barras', centrado en (cx, cy) con alto de referencia s."""
-    d.text((cx, cy - s * 0.06), "B/S", fill=color, font=font(int(s * 0.42)), anchor="mm")
-    d.rectangle([cx - s * 0.36, cy + s * 0.25, cx + s * 0.36, cy + s * 0.30], fill=color)
-
-
 def legacy(size, round_):
-    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    if round_:
-        d.ellipse([0, 0, size - 1, size - 1], fill=ORANGE)
-    else:
-        d.rounded_rectangle([0, 0, size - 1, size - 1], radius=size * 0.12, fill=ORANGE)
-    mark(d, size / 2, size / 2, size * 0.82, INK)
-    return img
+    return render(size, ORANGE, INK, "circle" if round_ else "rounded", mark=.62 if round_ else .66)
 
 
-def foreground(size):  # icono adaptativo: el dibujo dentro de la zona segura (66 % central)
-    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    mark(ImageDraw.Draw(img), size / 2, size / 2, size * 0.58, INK)
-    return img
+def foreground(size):  # icono adaptativo: el dibujo dentro de la zona segura (66 % central); la estrella es un hueco
+    return render(size, None, INK, None, mark=.5)
 
 
 DENS = {"mdpi": 1, "hdpi": 1.5, "xhdpi": 2, "xxhdpi": 3, "xxxhdpi": 4}
@@ -52,9 +34,8 @@ with open(os.path.join(RES, "values", "ic_launcher_background.xml"), "w", encodi
 for path in glob.glob(os.path.join(RES, "drawable*", "splash.png")):
     w, h = Image.open(path).size
     img = Image.new("RGB", (w, h), PAPER)
-    d = ImageDraw.Draw(img)
-    s = min(w, h) * 0.32
-    d.rectangle([w / 2 - s / 2, h / 2 - s / 2, w / 2 + s / 2, h / 2 + s / 2], fill=ORANGE)
-    mark(d, w / 2, h / 2, s * 0.9, INK)
+    s = int(min(w, h) * 0.32)
+    icon = render(s, ORANGE, INK, "rounded", mark=.66)
+    img.paste(icon, ((w - s) // 2, (h - s) // 2), icon)
     img.save(path)
 print("iconos y splash listos")

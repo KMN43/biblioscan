@@ -24,7 +24,8 @@
   .mono-caps { font-family: 'IBM Plex Mono', monospace; text-transform: uppercase; letter-spacing: .08em; font-size: 11px; }
 
   .side { background: var(--orange); display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 18px 0 22px; }
-  .logo { font-family: 'Chakra Petch', sans-serif; font-size: 26px; line-height: .9; }
+  .logo { line-height: 0; }
+  .logo svg { width: 46px; height: auto; display: block; }
   .side-title { writing-mode: vertical-rl; transform: rotate(180deg); font-family: 'Space Grotesk', sans-serif; font-size: 38px; font-weight: 500; white-space: nowrap; }
   .arrow { font-family: 'Space Grotesk'; font-size: 46px; line-height: 1; }
 
@@ -279,7 +280,7 @@
 <body>
 <aside class="side">
   <div class="side-top">
-    <div class="logo">B/S</div>
+    <div class="logo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="-50 -32 100 66" role="img" aria-label="BiblioScan"><path fill="currentColor" fill-rule="evenodd" d="M-46 30 L-46 -28 L-27 -28 A24 24 0 0 1 -3 -4 L0 1 L3 -4 A24 24 0 0 1 27 -28 L46 -28 L46 30 Z M0.00 -9.70 Q2.21 6.79 18.70 9.00 Q2.21 11.21 0.00 27.70 Q-2.21 11.21 -18.70 9.00 Q-2.21 6.79 0.00 -9.70 Z"/></svg></div>
     <nav class="tabs mono-caps">
       <!-- escáner: visor + código de barras · catálogo: rejilla de fichas · biblioteca: libros en una balda -->
       <button id="tabScan" class="active" title="Escáner · tecla 1" aria-label="Escáner"><svg viewBox="0 0 24 24"><path d="M3 8V4h4M17 4h4v4M21 16v4h-4M7 20H3v-4"/><path d="M7.5 8v8M10 8v8M12.5 8v8M15 8v8M16.5 8v8"/></svg></button>

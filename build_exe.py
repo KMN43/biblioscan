@@ -10,24 +10,16 @@ import shutil
 import subprocess
 import sys
 
-from PIL import Image, ImageDraw, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ICON = os.path.join(HERE, "biblioscan.ico")
 
 
 def make_icon():
-    S = 256
-    img = Image.new("RGBA", (S, S), "#ff4f12")
-    d = ImageDraw.Draw(img)
-    d.rectangle([14, 14, S - 15, S - 15], outline="#121212", width=10)
-    try:
-        font = ImageFont.truetype("arialbd.ttf", 104)
-    except OSError:
-        font = ImageFont.load_default()
-    d.text((S / 2, S / 2 - 6), "B/S", fill="#121212", font=font, anchor="mm")
-    d.rectangle([40, S - 62, S - 41, S - 50], fill="#121212")  # "código de barras" minimalista
-    img.save(ICON, sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
+    from logo import render
+    sizes = [16, 24, 32, 48, 64, 128, 256]
+    imgs = [render(n, mark=.72 if n <= 24 else .66) for n in sizes]   # en pequeño, el libro algo mayor
+    imgs[-1].save(ICON, sizes=[(n, n) for n in sizes], append_images=imgs[:-1])
 
 
 def main():

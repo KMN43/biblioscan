@@ -15,8 +15,8 @@
 .datab p { margin: 0 0 12px; line-height: 1.5; }
 .datab .lbl { color: var(--muted); margin: 18px 0 8px; padding-top: 14px; border-top: 1px solid #cfccc4; }
 .infoh { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.ilogo { width: 46px; height: 46px; background: var(--orange); display: flex; align-items: center; justify-content: center;
-         font: 700 16px 'Chakra Petch', sans-serif; flex: none; }
+.ilogo { width: 46px; height: 46px; background: var(--orange); border-radius: 10px; display: flex; align-items: center; justify-content: center; flex: none; color: var(--ink); }
+.ilogo svg { width: 32px; height: auto; display: block; }
 .infoh b { display: block; font: 500 22px/1 'Space Grotesk', sans-serif; letter-spacing: -.02em; }
 .infoh span { display: block; color: var(--muted); margin-top: 5px; }
 .ilink { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--ink); padding-bottom: 2px; }
